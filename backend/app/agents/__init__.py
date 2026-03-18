@@ -1,28 +1,43 @@
-"""Agent module for AFSA AI Team Layer.
-
-This module provides the agent implementations for the AFSA system,
-including PM Agent, Frontend Agent, Backend Agent, Data Agent, and Architect Agent.
 """
+AFSA Agents Package
+
+Agent 系统模块：
+- PM Agent: 产品经理智能体
+- Architect Agent: 架构师智能体 (待实现)
+- Frontend Agent: 前端开发智能体 (待实现)
+- Backend Agent: 后端开发智能体 (待实现)
+- Data Agent: 数据工程师智能体 (待实现)
+"""
+
 from app.agents.base import (
-    AgentResponse,
-    AgentType,
     BaseAgent,
+    AgentResponse,
     TaskCard,
+    TaskType,
+    TaskPriority,
+    TaskStatus,
+    AgentType,
+    RequirementSpec,
+    tool,
+    create_agent,
 )
-from app.agents.llm import (
-    BaseLLM,
-    ChatMessage,
-    get_llm,
-)
+
+from app.agents.pm_agent import PMAgent, create_pm_agent
 
 __all__ = [
     # Base
-    "AgentResponse",
-    "AgentType",
     "BaseAgent",
+    "AgentResponse",
     "TaskCard",
-    # LLM
-    "BaseLLM",
-    "ChatMessage",
-    "get_llm",
+    "TaskType",
+    "TaskPriority",
+    "TaskStatus",
+    "AgentType",
+    "RequirementSpec",
+    "tool",
+    "create_agent",
+    
+    # PM Agent
+    "PMAgent",
+    "create_pm_agent",
 ]

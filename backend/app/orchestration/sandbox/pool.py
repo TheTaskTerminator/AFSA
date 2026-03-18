@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import uuid
-from typing import Optional
+from typing import Literal, Optional
 
 from app.config import settings
 from app.orchestration.sandbox.instance import (
@@ -13,49 +13,130 @@ from app.orchestration.sandbox.instance import (
 
 logger = logging.getLogger(__name__)
 
+# Import Docker instance if available
+try:
+    from app.orchestration.sandbox.docker_instance import (
+        DockerSandboxInstance,
+        is_docker_available,
+    )
+    DOCKER_AVAILABLE = True
+except ImportError:
+    DOCKER_AVAILABLE = False
+    is_docker_available = lambda: False
+
 
 class SandboxPool:
-    """Pool manager for sandbox instances."""
+    """Pool manager for sandbox instances.
+
+    Supports both local (subprocess) and Docker-based sandbox instances.
+    Docker provides true isolation with resource limits and network control.
+    """
 
     def __init__(
         self,
         pool_size: int = settings.sandbox_pool_size,
         timeout_seconds: int = settings.sandbox_timeout_seconds,
+        sandbox_type: Literal["local", "docker"] = None,
+        prewarm_docker: bool = True,
     ):
         self._pool_size = pool_size
         self._timeout = timeout_seconds
+        self._sandbox_type = sandbox_type or settings.sandbox_type
+        self._prewarm_docker = prewarm_docker
         self._instances: dict[str, SandboxInstance] = {}
         self._available: asyncio.Queue[str] = asyncio.Queue()
         self._initialized = False
         self._semaphore = asyncio.Semaphore(pool_size)
 
-    async def initialize(self) -> None:
-        """Initialize sandbox pool with pre-warmed instances."""
-        if self._initialized:
-            return
+    @property
+    def sandbox_type(self) -> str:
+        """Get the sandbox type being used."""
+        # Fallback to local if Docker requested but unavailable
+        if self._sandbox_type == "docker" and not DOCKER_AVAILABLE:
+            logger.warning("Docker requested but not available, falling back to local")
+            return "local"
+        if self._sandbox_type == "docker" and not is_docker_available():
+            logger.warning("Docker daemon not running, falling back to local")
+            return "local"
+        return self._sandbox_type
 
-        logger.info(f"Initializing sandbox pool with {self._pool_size} instances...")
+    def _create_instance(self, sandbox_id: str) -> SandboxInstance:
+        """Create a sandbox instance based on configured type.
 
-        # Create and initialize instances
-        tasks = []
-        for i in range(self._pool_size):
-            sandbox_id = str(uuid.uuid4())[:8]
-            instance = LocalSandboxInstance(
+        Args:
+            sandbox_id: Unique identifier for the instance
+
+        Returns:
+            SandboxInstance (Local or Docker-based)
+        """
+        if self.sandbox_type == "docker":
+            return DockerSandboxInstance(
                 sandbox_id=sandbox_id,
                 timeout_seconds=self._timeout,
             )
+        else:
+            return LocalSandboxInstance(
+                sandbox_id=sandbox_id,
+                timeout_seconds=self._timeout,
+            )
+
+    async def initialize(self) -> None:
+        """Initialize sandbox pool with pre-warmed instances.
+
+        For Docker sandboxes, optionally pre-warm containers for faster execution.
+        """
+        if self._initialized:
+            return
+
+        logger.info(
+            f"Initializing {self.sandbox_type} sandbox pool "
+            f"with {self._pool_size} instances..."
+        )
+
+        # Create and initialize instances
+        tasks = []
+        instances_to_prewarm = []
+
+        for i in range(self._pool_size):
+            sandbox_id = str(uuid.uuid4())[:8]
+            instance = self._create_instance(sandbox_id)
             self._instances[sandbox_id] = instance
             tasks.append(instance.initialize())
 
+            # Track Docker instances for pre-warming
+            if self.sandbox_type == "docker" and self._prewarm_docker:
+                instances_to_prewarm.append(instance)
+
         # Wait for all instances to initialize
-        await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Log any initialization failures
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"Failed to initialize sandbox: {result}")
+
+        # Pre-warm Docker containers
+        prewarm_count = min(
+            len(instances_to_prewarm),
+            settings.docker_sandbox_prewarm_pool,
+        )
+        if prewarm_count > 0:
+            logger.info(f"Pre-warming {prewarm_count} Docker containers...")
+            prewarm_tasks = [
+                inst.prewarm()
+                for inst in instances_to_prewarm[:prewarm_count]
+            ]
+            await asyncio.gather(*prewarm_tasks, return_exceptions=True)
 
         # Add all instance IDs to available queue
         for sandbox_id in self._instances:
             await self._available.put(sandbox_id)
 
         self._initialized = True
-        logger.info(f"Sandbox pool initialized with {len(self._instances)} instances")
+        logger.info(
+            f"Sandbox pool initialized with {len(self._instances)} "
+            f"{self.sandbox_type} instances"
+        )
 
     async def acquire(self, timeout: float = 30.0) -> Optional[SandboxInstance]:
         """Acquire a sandbox instance from the pool.
@@ -131,6 +212,7 @@ class SandboxPool:
     async def health_check(self) -> dict:
         """Check health of all sandbox instances."""
         results = {
+            "sandbox_type": self.sandbox_type,
             "total": len(self._instances),
             "available": self._available.qsize(),
             "instances": {},

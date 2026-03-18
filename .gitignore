@@ -87,8 +87,8 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
-# Claude Code
-.claude/
+# Claude Code (keep project memory)
+# .claude/
 
 # Project specific
 afsa/backend/.uv/

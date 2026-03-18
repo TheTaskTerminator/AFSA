@@ -98,6 +98,15 @@ class Settings(BaseSettings):
     # Sandbox
     sandbox_pool_size: int = 5
     sandbox_timeout_seconds: int = 60
+    sandbox_type: Literal["local", "docker"] = "local"
+
+    # Docker Sandbox
+    docker_sandbox_image: str = "python:3.11-slim"
+    docker_sandbox_memory_mb: int = 256
+    docker_sandbox_cpu_limit: float = 1.0
+    docker_sandbox_network_disabled: bool = True
+    docker_sandbox_timeout_seconds: int = 60
+    docker_sandbox_prewarm_pool: int = 2  # 预热容器数量
 
     class Config:
         env_file = ".env"

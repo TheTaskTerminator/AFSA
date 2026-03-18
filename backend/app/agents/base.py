@@ -11,6 +11,7 @@ class AgentType(str, Enum):
     FRONTEND = "frontend"
     BACKEND = "backend"
     DATA = "data"
+    ARCHITECT = "architect"
 
 
 @dataclass

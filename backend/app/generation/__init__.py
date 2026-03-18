@@ -1,25 +1,26 @@
-"""Code generation module.
-
-This module provides framework-agnostic code generation infrastructure.
 """
-from app.generation.base import (
+AFSA Code Generation Package
+
+代码生成模块：
+- 支持多种目标框架 (FastAPI, Django, NestJS 等)
+- 基于模板的代码生成
+- 结构化需求转换
+"""
+
+from app.generation.code_generator import (
     CodeGenerator,
-    CodeGeneratorRegistry,
+    FastAPICodeGenerator,
     GeneratedFile,
-    GeneratedFileType,
-    GenerationContext,
-    write_generated_files,
+    CodeGenerationResult,
+    get_code_generator,
+    generate_code_from_task,
 )
-from app.generation.fastapi import FastAPIGenerator
 
 __all__ = [
-    # Base classes
     "CodeGenerator",
-    "CodeGeneratorRegistry",
+    "FastAPICodeGenerator",
     "GeneratedFile",
-    "GeneratedFileType",
-    "GenerationContext",
-    "write_generated_files",
-    # Framework generators
-    "FastAPIGenerator",
+    "CodeGenerationResult",
+    "get_code_generator",
+    "generate_code_from_task",
 ]

@@ -1,7 +1,7 @@
 """Unit tests for Backend Agent."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.agents.backend_agent import (
@@ -409,7 +409,7 @@ class TestBackendAgentWithMockedLLM:
         session.messages.append({
             "role": "user",
             "content": "Create user management API",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
         task_card = await agent.generate_task_card("task-test")
@@ -449,7 +449,7 @@ class TestBackendAgentWithMockedLLM:
                 type="feature",
                 priority="medium",
                 description="Create user CRUD API",
-                structured_requirements=[],
+                requirements=[],
                 constraints={
                     "fields": [
                         {"name": "name", "type": "string"},
@@ -484,7 +484,7 @@ class TestBackendAgentWithMockedLLM:
                 type="feature",
                 priority="high",
                 description="Add search endpoint",
-                structured_requirements=[],
+                requirements=[],
                 constraints={},
             )
 

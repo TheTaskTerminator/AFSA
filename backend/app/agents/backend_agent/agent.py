@@ -4,7 +4,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.agents.base import AgentResponse, AgentType, BaseAgent, TaskCard
@@ -36,8 +36,8 @@ class BackendSession:
     generated_files: List[GeneratedFile] = field(default_factory=list)
     context: Dict[str, Any] = field(default_factory=dict)
     is_complete: bool = False
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class BackendAgent(BaseAgent):
@@ -128,7 +128,7 @@ class BackendAgent(BaseAgent):
         session.messages.append({
             "role": "user",
             "content": message,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
         try:
@@ -150,9 +150,9 @@ class BackendAgent(BaseAgent):
             session.messages.append({
                 "role": "assistant",
                 "content": content,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             })
-            session.updated_at = datetime.utcnow()
+            session.updated_at = datetime.now(timezone.utc)
 
             if parsed.get("type") == "clarification":
                 return AgentResponse(
@@ -238,15 +238,7 @@ class BackendAgent(BaseAgent):
             type="feature",
             priority="medium",
             description="API 代码生成任务",
-            structured_requirements=[
-                {
-                    "id": f"req-{i+1}",
-                    "description": msg.get("content", ""),
-                    "acceptance_criteria": "API 正常响应，无安全漏洞",
-                }
-                for i, msg in enumerate(session.messages)
-                if msg.get("role") == "user"
-            ],
+            requirements=[],
             constraints={
                 "technology_stack": ["FastAPI", "SQLAlchemy", "Pydantic", "PostgreSQL"],
             },
@@ -268,7 +260,7 @@ class BackendAgent(BaseAgent):
         try:
             # Extract requirements from task card
             description = task_card.description
-            requirements = task_card.structured_requirements
+            requirements = task_card.requirements
             constraints = task_card.constraints
 
             # Detect what to generate

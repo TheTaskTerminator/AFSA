@@ -7,7 +7,7 @@ Agent 系统的基础类和接口定义。
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 import uuid
 
@@ -80,7 +80,7 @@ class TaskCard(BaseModel):
     
     # 生命周期
     status: TaskStatus = TaskStatus.DRAFT
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
     created_by: str = "user"
     approved_by: Optional[str] = None
@@ -99,19 +99,19 @@ class TaskCard(BaseModel):
     def mark_running(self) -> None:
         """标记任务为运行中"""
         self.status = TaskStatus.RUNNING
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
     
     def mark_completed(self, result: Dict[str, Any]) -> None:
         """标记任务为完成"""
         self.status = TaskStatus.COMPLETED
         self.result = result
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
     
     def mark_failed(self, error: str) -> None:
         """标记任务为失败"""
         self.status = TaskStatus.FAILED
         self.error_message = error
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
 
 class AgentResponse(BaseModel):

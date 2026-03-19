@@ -78,13 +78,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.db.session import get_db
-from app.schemas.{model_lower} import {Model}Create, {Model}Update, {Model}Response
+from app.schemas.{model_lower} import {model}Create, {model}Update, {model}Response
 from app.api.deps import get_current_user
 
 router = APIRouter(prefix=\"/{model_lower}s\", tags=[\"{model}\"])
 
 
-@router.get(\"/\", response_model=List[{Model}Response])
+@router.get(\"/\", response_model=List[{model}Response])
 async def list_{model_lower}s(
     skip: int = 0,
     limit: int = 100,
@@ -96,7 +96,7 @@ async def list_{model_lower}s(
     return []
 
 
-@router.get(\"/{{id}}\", response_model={Model}Response)
+@router.get(\"/{{id}}\", response_model={model}Response)
 async def get_{model_lower}(
     id: int,
     db: AsyncSession = Depends(get_db),
@@ -107,9 +107,9 @@ async def get_{model_lower}(
     raise HTTPException(status_code=404, detail=\"{model_cn}不存在\")
 
 
-@router.post(\"/\", response_model={Model}Response, status_code=status.HTTP_201_CREATED)
+@router.post(\"/\", response_model={model}Response, status_code=status.HTTP_201_CREATED)
 async def create_{model_lower}(
-    data: {Model}Create,
+    data: {model}Create,
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
@@ -118,10 +118,10 @@ async def create_{model_lower}(
     return {{}}
 
 
-@router.put(\"/{{id}}\", response_model={Model}Response)
+@router.put(\"/{{id}}\", response_model={model}Response)
 async def update_{model_lower}(
     id: int,
-    data: {Model}Update,
+    data: {model}Update,
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
@@ -148,7 +148,7 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 
-class {Model}(Base):
+class {model}(Base):
     \"\"\"{model_cn}模型。\"\"\"
 
     __tablename__ = \"{table_name}\"
@@ -159,7 +159,7 @@ class {Model}(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     def __repr__(self):
-        return f\"<{Model}(id={{self.id}})>\"
+        return f\"<{model}(id={{self.id}})>\"
 """
 
 # Pydantic schema template
@@ -168,22 +168,22 @@ from datetime import datetime
 from typing import Optional, List
 
 
-class {Model}Base(BaseModel):
+class {model}Base(BaseModel):
     \"\"\"{model_cn}基础模型。\"\"\"
     {base_fields}
 
 
-class {Model}Create({Model}Base):
+class {model}Create({model}Base):
     \"\"\"{model_cn}创建模型。\"\"\"
     pass
 
 
-class {Model}Update(BaseModel):
+class {model}Update(BaseModel):
     \"\"\"{model_cn}更新模型。\"\"\"
     {update_fields}
 
 
-class {Model}Response({Model}Base):
+class {model}Response({model}Base):
     \"\"\"{model_cn}响应模型。\"\"\"
     id: int
     created_at: datetime

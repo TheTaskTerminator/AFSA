@@ -1,0 +1,61 @@
+{
+  "tasks": [
+    {
+      "id": "TASK-DEMO-001",
+      "title": "为订单列表添加批量导出按钮",
+      "type": "feature",
+      "priority": "medium",
+      "status": "completed",
+      "description": "用户希望通过自然语言指令，为订单管理页面添加一个批量导出功能",
+      "createdAt": "2026-03-19T10:00:00.000Z",
+      "completedAt": "2026-03-19T10:05:00.000Z",
+      "progress": 100,
+      "generatedFiles": 4,
+      "testsPassed": 12
+    },
+    {
+      "id": "TASK-DEMO-002",
+      "title": "添加订单详情页面",
+      "type": "feature",
+      "priority": "high",
+      "status": "in_progress",
+      "description": "创建订单详情页面，展示订单完整信息和操作历史",
+      "createdAt": "2026-03-19T09:30:00.000Z",
+      "progress": 65,
+      "generatedFiles": 3,
+      "testsPassed": 5
+    },
+    {
+      "id": "TASK-DEMO-003",
+      "title": "修复订单搜索功能",
+      "type": "bugfix",
+      "priority": "critical",
+      "status": "completed",
+      "description": "修复订单搜索在特殊字符情况下返回错误结果的问题",
+      "createdAt": "2026-03-19T08:45:00.000Z",
+      "completedAt": "2026-03-19T09:00:00.000Z",
+      "progress": 100,
+      "generatedFiles": 2,
+      "testsPassed": 8
+    },
+    {
+      "id": "TASK-DEMO-004",
+      "title": "优化数据库查询性能",
+      "type": "refactor",
+      "priority": "medium",
+      "status": "pending",
+      "description": "为订单表添加索引，优化大数据量查询性能",
+      "createdAt": "2026-03-19T11:00:00.000Z",
+      "progress": 0,
+      "generatedFiles": 0,
+      "testsPassed": 0
+    }
+  ],
+  "statistics": {
+    "total": 4,
+    "completed": 2,
+    "inProgress": 1,
+    "pending": 1,
+    "failed": 0
+  }
+}

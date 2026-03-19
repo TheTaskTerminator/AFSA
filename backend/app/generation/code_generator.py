@@ -464,7 +464,7 @@ const {component_name}: React.FC<{component_name}Props> = ({{}}) => {{
   return (
     <div className="{component_name.lower()}">
       <h1>{component_name}</h1>
-      {/* TODO: Implement component content */}}
+      {{/* TODO: Implement component content */}}
     </div>
   );
 }};

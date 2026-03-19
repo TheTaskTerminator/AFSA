@@ -17,6 +17,7 @@ from app.core.config import (
     DatabaseConfig,
     get_default_config,
     validate_config,
+    create_example_config,
 )
 
 

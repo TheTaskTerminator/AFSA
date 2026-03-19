@@ -261,7 +261,12 @@ class BackendAgent(BaseAgent):
             # Extract requirements from task card
             description = task_card.description
             requirements = task_card.requirements
-            constraints = task_card.constraints
+            # Build constraints from task card fields
+            constraints = {
+                "target_zone": task_card.target_zone,
+                "timeout_seconds": task_card.timeout_seconds,
+                "requires_approval": task_card.requires_approval,
+            }
 
             # Detect what to generate
             api_type = detect_api_type(description)

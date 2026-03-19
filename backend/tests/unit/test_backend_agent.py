@@ -448,19 +448,13 @@ class TestBackendAgentWithMockedLLM:
                 id="task-1",
                 type="feature",
                 priority="medium",
-                description="Create user CRUD API",
+                description="Create user CRUD API with fields: name, email",
                 requirements=[],
-                constraints={
-                    "fields": [
-                        {"name": "name", "type": "string"},
-                        {"name": "email", "type": "string"},
-                    ]
-                },
             )
 
             response = await agent.execute(task_card)
             assert response.success is True
-            assert response.task_card is not None
+            assert response.content is not None
 
     @pytest.mark.asyncio
     async def test_execute_task_endpoint(self, agent_with_mocked_llm):
@@ -483,9 +477,8 @@ class TestBackendAgentWithMockedLLM:
                 id="task-2",
                 type="feature",
                 priority="high",
-                description="Add search endpoint",
+                description="Add search endpoint for products",
                 requirements=[],
-                constraints={},
             )
 
             response = await agent.execute(task_card)

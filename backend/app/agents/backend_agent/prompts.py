@@ -296,19 +296,22 @@ def get_model_template(model: str, fields: str, model_cn: str = "") -> str:
     )
 
 
-def get_schema_template(model: str, base_fields: str = "", update_fields: str = "") -> str:
+def get_schema_template(model: str, base_fields: str = "", update_fields: str = "", model_cn: str = "") -> str:
     """Get Pydantic schema template.
 
     Args:
         model: Model name in PascalCase
         base_fields: Base model fields
         update_fields: Update model fields
+        model_cn: Model name in Chinese (optional)
 
     Returns:
         Template string
     """
+    model_cn = model_cn or model
     return SCHEMA_TEMPLATE.format(
         model=model,
+        model_cn=model_cn,
         base_fields=base_fields or "pass",
         update_fields=update_fields or "pass",
     )

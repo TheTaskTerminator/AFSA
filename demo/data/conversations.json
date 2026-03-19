@@ -1,0 +1,143 @@
+{
+  "conversations": [
+    {
+      "id": "conv-demo-001",
+      "title": "订单导出功能需求",
+      "createdAt": "2026-03-19T10:00:00.000Z",
+      "messages": [
+        {
+          "id": "msg-001",
+          "role": "user",
+          "content": "给订单列表添加一个批量导出按钮，支持导出为 Excel 格式",
+          "timestamp": "2026-03-19T10:00:00.000Z"
+        },
+        {
+          "id": "msg-002",
+          "role": "assistant",
+          "content": "我理解您想为订单列表添加批量导出功能。\n\n为了更准确地实现您的需求，我想确认几个细节：\n\n1. 导出范围：导出当前页数据还是全部订单？\n2. 导出字段：需要包含哪些字段？（订单号、客户名、金额、状态、创建时间）\n3. 权限控制：是否需要限制特定角色才能使用导出功能？\n\n您可以直接回答，或说\"使用默认设置\"继续。",
+          "timestamp": "2026-03-19T10:00:15.000Z",
+          "agent": "pm-agent"
+        },
+        {
+          "id": "msg-003",
+          "role": "user",
+          "content": "使用默认设置",
+          "timestamp": "2026-03-19T10:00:45.000Z"
+        },
+        {
+          "id": "msg-004",
+          "role": "assistant",
+          "content": "好的，我将使用以下默认设置：\n\n✓ 导出范围：当前筛选条件下的全部订单\n✓ 导出字段：订单号、客户名、金额、状态、创建时间\n✓ 权限控制：登录用户均可使用\n\n正在生成任务卡并开始执行...",
+          "timestamp": "2026-03-19T10:01:00.000Z",
+          "agent": "pm-agent"
+        },
+        {
+          "id": "msg-005",
+          "role": "system",
+          "content": "任务卡 #TASK-DEMO-001 已创建",
+          "timestamp": "2026-03-19T10:01:05.000Z",
+          "type": "task_created",
+          "taskId": "TASK-DEMO-001"
+        },
+        {
+          "id": "msg-006",
+          "role": "assistant",
+          "content": "🔨 正在生成代码...\n\n[✓] 生成后端 API: orders/export.py (120 行)\n[✓] 生成前端组件：OrderExportButton.tsx (45 行)\n[✓] 生成类型定义：types/order.ts (15 行)\n[✓] 更新路由配置：routes.ts",
+          "timestamp": "2026-03-19T10:02:30.000Z",
+          "agent": "dev-agent",
+          "type": "code_generation"
+        },
+        {
+          "id": "msg-007",
+          "role": "assistant",
+          "content": "🧪 正在沙箱验证...\n\n[✓] 代码语法检查通过\n[✓] 单元测试通过 (8/8)\n[✓] API 集成测试通过",
+          "timestamp": "2026-03-19T10:04:00.000Z",
+          "agent": "test-agent",
+          "type": "test_result"
+        },
+        {
+          "id": "msg-008",
+          "role": "system",
+          "content": "任务 #TASK-DEMO-001 已完成！生成 4 个文件，通过 12 个测试。",
+          "timestamp": "2026-03-19T10:05:00.000Z",
+          "type": "task_completed",
+          "taskId": "TASK-DEMO-001"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-002",
+      "title": "订单详情页需求",
+      "createdAt": "2026-03-19T09:30:00.000Z",
+      "messages": [
+        {
+          "id": "msg-101",
+          "role": "user",
+          "content": "我需要一个订单详情页面，能看到订单的所有信息和操作历史",
+          "timestamp": "2026-03-19T09:30:00.000Z"
+        },
+        {
+          "id": "msg-102",
+          "role": "assistant",
+          "content": "明白了！我将为您创建一个订单详情页面。\n\n计划包含以下内容：\n- 订单基本信息（订单号、客户、金额、状态）\n- 订单明细列表\n- 操作历史记录\n- 相关操作按钮（编辑、取消、导出等）\n\n是否还需要其他功能？",
+          "timestamp": "2026-03-19T09:30:20.000Z",
+          "agent": "pm-agent"
+        },
+        {
+          "id": "msg-103",
+          "role": "user",
+          "content": "很好，就这些。另外希望能支持打印功能",
+          "timestamp": "2026-03-19T09:31:00.000Z"
+        },
+        {
+          "id": "msg-104",
+          "role": "assistant",
+          "content": "好的，我会添加打印功能。正在生成任务卡...",
+          "timestamp": "2026-03-19T09:31:15.000Z",
+          "agent": "pm-agent"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-003",
+      "title": "搜索功能修复",
+      "createdAt": "2026-03-19T08:45:00.000Z",
+      "messages": [
+        {
+          "id": "msg-201",
+          "role": "user",
+          "content": "订单搜索有问题，输入特殊字符会报错",
+          "timestamp": "2026-03-19T08:45:00.000Z"
+        },
+        {
+          "id": "msg-202",
+          "role": "assistant",
+          "content": "我来帮您排查这个问题。请问：\n1. 输入什么特殊字符会报错？\n2. 报错的具体信息是什么？\n3. 是所有搜索都报错，还是特定字段？",
+          "timestamp": "2026-03-19T08:45:15.000Z",
+          "agent": "pm-agent"
+        },
+        {
+          "id": "msg-203",
+          "role": "user",
+          "content": "输入%或者_的时候，搜索返回错误。错误信息是 SQL 语法错误",
+          "timestamp": "2026-03-19T08:46:00.000Z"
+        },
+        {
+          "id": "msg-204",
+          "role": "assistant",
+          "content": "明白了！这是 SQL 注入防护问题。%和_是 SQL LIKE 语句的通配符，需要进行转义处理。\n\n我将修复搜索功能，添加输入验证和参数化查询。这是紧急问题，我会优先处理。",
+          "timestamp": "2026-03-19T08:46:30.000Z",
+          "agent": "pm-agent"
+        },
+        {
+          "id": "msg-205",
+          "role": "system",
+          "content": "任务 #TASK-DEMO-003 已完成！修复了 SQL 注入漏洞，通过 8 个安全测试。",
+          "timestamp": "2026-03-19T09:00:00.000Z",
+          "type": "task_completed",
+          "taskId": "TASK-DEMO-003"
+        }
+      ]
+    }
+  ]
+}

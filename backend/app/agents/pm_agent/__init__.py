@@ -1,5 +1,7 @@
 """PM Agent package for requirement analysis and task management."""
 
+from typing import Any, Dict, Optional
+
 from app.agents.pm_agent.agent import ConversationState, PMAgent
 from app.agents.pm_agent.prompts import (
     CLARIFICATION_TEMPLATES,
@@ -20,10 +22,23 @@ from app.agents.pm_agent.tools import (
     TaskAnalysisTool,
 )
 
+def create_pm_agent(config: Optional[Dict[str, Any]] = None) -> PMAgent:
+    """Create a PM Agent instance.
+    
+    Args:
+        config: Optional configuration dictionary
+        
+    Returns:
+        PMAgent instance
+    """
+    return PMAgent(config=config)
+
+
 __all__ = [
     # Agent
     "PMAgent",
     "ConversationState",
+    "create_pm_agent",
     # Prompts
     "PM_SYSTEM_PROMPT",
     "CLARIFICATION_TEMPLATES",

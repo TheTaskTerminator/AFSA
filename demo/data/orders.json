@@ -1,0 +1,103 @@
+{
+  "orders": [
+    {
+      "id": "ORD-2026-001",
+      "orderNo": "SO-20260319-001",
+      "customerName": "上海科技有限公司",
+      "amount": 125000.00,
+      "status": "completed",
+      "createdAt": "2026-03-15T09:30:00.000Z",
+      "items": [
+        {"name": "企业版授权", "quantity": 10, "price": 12500.00}
+      ]
+    },
+    {
+      "id": "ORD-2026-002",
+      "orderNo": "SO-20260319-002",
+      "customerName": "北京创新集团",
+      "amount": 89000.00,
+      "status": "processing",
+      "createdAt": "2026-03-16T14:20:00.000Z",
+      "items": [
+        {"name": "专业版授权", "quantity": 5, "price": 17800.00}
+      ]
+    },
+    {
+      "id": "ORD-2026-003",
+      "orderNo": "SO-20260319-003",
+      "customerName": "深圳智能硬件有限公司",
+      "amount": 256000.00,
+      "status": "completed",
+      "createdAt": "2026-03-17T11:45:00.000Z",
+      "items": [
+        {"name": "企业版授权", "quantity": 20, "price": 12800.00}
+      ]
+    },
+    {
+      "id": "ORD-2026-004",
+      "orderNo": "SO-20260319-004",
+      "customerName": "杭州电子商务有限公司",
+      "amount": 45000.00,
+      "status": "pending",
+      "createdAt": "2026-03-18T16:10:00.000Z",
+      "items": [
+        {"name": "基础版授权", "quantity": 3, "price": 15000.00}
+      ]
+    },
+    {
+      "id": "ORD-2026-005",
+      "orderNo": "SO-20260319-005",
+      "customerName": "广州贸易有限公司",
+      "amount": 178000.00,
+      "status": "completed",
+      "createdAt": "2026-03-19T08:30:00.000Z",
+      "items": [
+        {"name": "专业版授权", "quantity": 10, "price": 17800.00}
+      ]
+    },
+    {
+      "id": "ORD-2026-006",
+      "orderNo": "SO-20260319-006",
+      "customerName": "成都软件开发中心",
+      "amount": 67500.00,
+      "status": "processing",
+      "createdAt": "2026-03-19T09:15:00.000Z",
+      "items": [
+        {"name": "专业版授权", "quantity": 3, "price": 22500.00},
+        {"name": "技术支持包", "quantity": 1, "price": 45000.00}
+      ]
+    },
+    {
+      "id": "ORD-2026-007",
+      "orderNo": "SO-20260319-007",
+      "customerName": "武汉智能制造研究院",
+      "amount": 320000.00,
+      "status": "pending",
+      "createdAt": "2026-03-19T10:00:00.000Z",
+      "items": [
+        {"name": "企业版授权", "quantity": 25, "price": 12800.00}
+      ]
+    },
+    {
+      "id": "ORD-2026-008",
+      "orderNo": "SO-20260319-008",
+      "customerName": "南京信息技术公司",
+      "amount": 92000.00,
+      "status": "cancelled",
+      "createdAt": "2026-03-18T13:20:00.000Z",
+      "items": [
+        {"name": "基础版授权", "quantity": 5, "price": 18400.00}
+      ]
+    }
+  ],
+  "statistics": {
+    "total": 8,
+    "totalAmount": 1172500.00,
+    "byStatus": {
+      "pending": 2,
+      "processing": 2,
+      "completed": 3,
+      "cancelled": 1
+    }
+  }
+}

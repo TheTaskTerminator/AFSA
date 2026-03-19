@@ -1,0 +1,221 @@
+{
+  "id": "TASK-DEMO-001",
+  "type": "feature",
+  "priority": "medium",
+  "status": "completed",
+  "title": "为订单列表添加批量导出按钮",
+  "description": "用户希望通过自然语言指令，为订单管理页面添加一个批量导出功能，支持将订单数据导出为 Excel 格式。",
+  "createdAt": "2026-03-19T10:00:00.000Z",
+  "updatedAt": "2026-03-19T10:05:00.000Z",
+  "completedAt": "2026-03-19T10:05:00.000Z",
+  "createdBy": "user",
+  "sessionId": "demo-session-001",
+  
+  "requirements": [
+    {
+      "type": "ui",
+      "name": "导出按钮组件",
+      "spec": {
+        "component": "OrderExportButton",
+        "location": "订单列表顶部工具栏",
+        "label": "批量导出",
+        "icon": "Download",
+        "style": "primary",
+        "position": "right"
+      },
+      "constraints": {
+        "framework": "react",
+        "styling": "tailwindcss"
+      }
+    },
+    {
+      "type": "api",
+      "name": "订单导出接口",
+      "spec": {
+        "method": "POST",
+        "path": "/api/orders/export",
+        "request": {
+          "type": "object",
+          "properties": {
+            "filters": {
+              "type": "object",
+              "description": "筛选条件"
+            },
+            "format": {
+              "type": "string",
+              "enum": ["xlsx", "csv"],
+              "default": "xlsx"
+            },
+            "fields": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": ["id", "orderNo", "customerName", "amount", "status", "createdAt"]
+            }
+          }
+        },
+        "response": {
+          "type": "file",
+          "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "headers": {
+            "Content-Disposition": "attachment; filename=\"orders_export.xlsx\""
+          }
+        }
+      },
+      "constraints": {
+        "framework": "fastapi",
+        "authentication": true,
+        "rateLimit": "10/minute"
+      }
+    },
+    {
+      "type": "model",
+      "name": "订单数据模型扩展",
+      "spec": {
+        "model": "Order",
+        "fields": [
+          {"name": "id", "type": "UUID", "required": true},
+          {"name": "orderNo", "type": "String", "required": true},
+          {"name": "customerName", "type": "String", "required": true},
+          {"name": "amount", "type": "Decimal", "required": true},
+          {"name": "status", "type": "Enum", "values": ["pending", "processing", "completed", "cancelled"]},
+          {"name": "createdAt", "type": "DateTime", "required": true}
+        ]
+      },
+      "constraints": {
+        "orm": "sqlalchemy",
+        "database": "postgresql"
+      }
+    }
+  ],
+  
+  "generatedFiles": [
+    {
+      "path": "frontend/src/components/orders/OrderExportButton.tsx",
+      "type": "typescript",
+      "lines": 45,
+      "status": "generated"
+    },
+    {
+      "path": "backend/app/api/orders/export.py",
+      "type": "python",
+      "lines": 120,
+      "status": "generated"
+    },
+    {
+      "path": "backend/app/schemas/order.py",
+      "type": "python",
+      "lines": 35,
+      "status": "updated"
+    },
+    {
+      "path": "frontend/src/types/order.ts",
+      "type": "typescript",
+      "lines": 20,
+      "status": "updated"
+    }
+  ],
+  
+  "testResults": {
+    "unitTests": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "duration": 2.3
+    },
+    "integrationTests": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "duration": 5.1
+    },
+    "e2eTests": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "duration": 3.2
+    }
+  },
+  
+  "sandboxExecution": {
+    "containerId": "sandbox-demo-001",
+    "image": "afsa-sandbox:latest",
+    "startTime": "2026-03-19T10:03:00.000Z",
+    "endTime": "2026-03-19T10:05:00.000Z",
+    "exitCode": 0,
+    "logs": [
+      "[INFO] 初始化沙箱环境...",
+      "[INFO] 安装依赖包...",
+      "[INFO] 运行代码生成器...",
+      "[INFO] 执行单元测试...",
+      "[INFO] 执行集成测试...",
+      "[INFO] 所有测试通过！",
+      "[INFO] 准备部署预览..."
+    ]
+  },
+  
+  "conversation": {
+    "messages": [
+      {
+        "id": "msg-001",
+        "role": "user",
+        "content": "给订单列表添加一个批量导出按钮，支持导出为 Excel 格式",
+        "timestamp": "2026-03-19T10:00:00.000Z"
+      },
+      {
+        "id": "msg-002",
+        "role": "assistant",
+        "content": "我理解您想为订单列表添加批量导出功能。\n\n为了更准确地实现您的需求，我想确认几个细节：\n\n1. 导出范围：导出当前页数据还是全部订单？\n2. 导出字段：需要包含哪些字段？（订单号、客户名、金额、状态、创建时间）\n3. 权限控制：是否需要限制特定角色才能使用导出功能？\n\n您可以直接回答，或说\"使用默认设置\"继续。",
+        "timestamp": "2026-03-19T10:00:15.000Z"
+      },
+      {
+        "id": "msg-003",
+        "role": "user",
+        "content": "使用默认设置",
+        "timestamp": "2026-03-19T10:00:45.000Z"
+      },
+      {
+        "id": "msg-004",
+        "role": "assistant",
+        "content": "好的，我将使用以下默认设置：\n\n✓ 导出范围：当前筛选条件下的全部订单\n✓ 导出字段：订单号、客户名、金额、状态、创建时间\n✓ 权限控制：登录用户均可使用\n\n正在生成任务卡并开始执行...",
+        "timestamp": "2026-03-19T10:01:00.000Z"
+      }
+    ]
+  },
+  
+  "metrics": {
+    "totalDuration": 300,
+    "understandingTime": 15,
+    "clarificationTime": 45,
+    "generationTime": 120,
+    "testingTime": 90,
+    "deploymentTime": 30,
+    "filesGenerated": 4,
+    "linesOfCode": 220,
+    "testsPassed": 12
+  },
+  
+  "preview": {
+    "codeDiff": {
+      "added": 220,
+      "removed": 0,
+      "modified": 2
+    },
+    "uiChanges": [
+      {
+        "component": "OrderList",
+        "change": "添加导出按钮到工具栏"
+      },
+      {
+        "component": "OrderExportButton",
+        "change": "新增组件"
+      }
+    ]
+  },
+  
+  "protocolVersion": "1.0",
+  "targetZone": "mutable",
+  "requiresApproval": false,
+  "approved": true,
+  "approvedAt": "2026-03-19T10:01:30.000Z",
+  "approvedBy": "user"
+}

@@ -1,0 +1,64 @@
+# AFSA 配置示例
+
+# 应用配置
+app:
+  name: my-afsa-app
+  version: 1.0.0
+  debug: true
+  environment: development
+
+# Agent 框架配置
+agents:
+  - name: langgraph
+    version: "0.1.0"
+    enabled: true
+    auto_install: true
+  
+  - name: crewai
+    version: "latest"
+    enabled: true
+    auto_install: true
+  
+  - name: autogen
+    version: "0.2.0"
+    enabled: false
+
+# LLM 提供商配置
+llm:
+  openai:
+    name: openai
+    enabled: true
+    auto_install: true
+    model: gpt-4-turbo
+    api_key: ${OPENAI_API_KEY}
+    base_url: null
+  
+  anthropic:
+    name: anthropic
+    enabled: false
+    auto_install: true
+    model: claude-3-opus
+    api_key: ${ANTHROPIC_API_KEY}
+  
+  glm:
+    name: glm
+    enabled: true
+    auto_install: true
+    model: glm-4
+    api_key: ${GLM_API_KEY}
+
+# 沙箱配置
+sandbox:
+  type: docker
+  timeout_seconds: 300
+  cpu_limit: 1.0
+  memory_limit: 512Mi
+  prewarm_pool: 2
+  network_disabled: true
+
+# 数据库配置
+database:
+  type: postgresql
+  url: ${DATABASE_URL}
+  pool_size: 10
+  max_overflow: 20

@@ -151,10 +151,26 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         {task.result && (
           <div>
             <h4 className="text-sm font-medium text-gray-700 mb-2">结果</h4>
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
               <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
                 {task.result.output ?? JSON.stringify(task.result, null, 2)}
               </pre>
+              {task.result.generated_files && task.result.generated_files.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-gray-500">生成文件</div>
+                  {task.result.generated_files.map((file) => (
+                    <div key={file.path} className="rounded border border-gray-200 bg-white p-2">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="font-mono text-gray-700">{file.path}</span>
+                        <span className="text-gray-400">{file.size} bytes</span>
+                      </div>
+                      {file.description && (
+                        <div className="mt-1 text-xs text-gray-500">{file.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

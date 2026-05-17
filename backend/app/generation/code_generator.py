@@ -375,6 +375,8 @@ class {model_name}InDB({model_name}Base):
     
     def _generate_api_code(self, model_name: str, endpoints: List[Dict]) -> str:
         """生成 API 代码"""
+        resource_name = model_name.lower()
+        payload_name = f"{resource_name}_data"
         code = f'''"""
 API Router: {model_name}
 """
@@ -386,44 +388,44 @@ from uuid import UUID
 from app.db.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/api/v1/{model_name.lower()}s", tags=["{model_name}"])
+router = APIRouter(prefix="/api/v1/{resource_name}s", tags=["{model_name}"])
 
 
 @router.get("/", response_model=List[dict])
-async def list_{model_name.lower()}s(
+async def list_{resource_name}s(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all {model_name.lower()}s"""
+    """List all {resource_name}s"""
     # TODO: Implement list logic
     return []
 
 
 @router.get("/{{item_id}}", response_model=dict)
-async def get_{model_name.lower()}({{item_id}}: UUID, db: AsyncSession = Depends(get_db)):
+async def get_{resource_name}(item_id: UUID, db: AsyncSession = Depends(get_db)):
     """Get {model_name} by ID"""
     # TODO: Implement get logic
     return {{"id": str(item_id)}}
 
 
 @router.post("/", response_model=dict)
-async def create_{model_name.lower()}({{model_name.lower()}}_data: dict, db: AsyncSession = Depends(get_db)):
-    """Create new {model_name.lower()}"""
+async def create_{resource_name}({payload_name}: dict, db: AsyncSession = Depends(get_db)):
+    """Create new {resource_name}"""
     # TODO: Implement create logic
-    return {{model_name.lower()}}_data
+    return {payload_name}
 
 
 @router.put("/{{item_id}}", response_model=dict)
-async def update_{model_name.lower()}({{item_id}}: UUID, {{model_name.lower()}}_data: dict, db: AsyncSession = Depends(get_db)):
-    """Update {model_name.lower()}"""
+async def update_{resource_name}(item_id: UUID, {payload_name}: dict, db: AsyncSession = Depends(get_db)):
+    """Update {resource_name}"""
     # TODO: Implement update logic
-    return {{model_name.lower()}}_data
+    return {payload_name}
 
 
 @router.delete("/{{item_id}}", response_model=dict)
-async def delete_{model_name.lower()}({{item_id}}: UUID, db: AsyncSession = Depends(get_db)):
-    """Delete {model_name.lower()}"""
+async def delete_{resource_name}(item_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Delete {resource_name}"""
     # TODO: Implement delete logic
     return {{"status": "deleted"}}
 '''

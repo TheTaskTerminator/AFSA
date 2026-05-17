@@ -15,7 +15,13 @@ from app.models.task import Task
 from app.orchestration.dispatcher.states import TaskState, TaskStateMachine
 from app.orchestration.messaging.publisher import EventType, get_event_publisher
 from app.orchestration.sandbox.pool import SandboxPool, get_sandbox_pool
-from app.api.v1.endpoints.websocket import get_connection_manager
+from app.agents.base import (
+    RequirementSpec,
+    TaskCard,
+    TaskPriority as AgentTaskPriority,
+    TaskType as AgentTaskType,
+)
+from app.generation.code_generator import generate_code_from_task
 
 logger = logging.getLogger(__name__)
 
@@ -331,6 +337,8 @@ class TaskDispatcher:
                     self._progress[task_id].completed_at = datetime.utcnow()
 
                 try:
+                    from app.api.v1.endpoints.websocket import get_connection_manager
+
                     await get_connection_manager().broadcast_task_completed(task_id, result_data)
                 except Exception as e:
                     logger.warning(f"Failed to broadcast task completion: {e}")
@@ -410,6 +418,8 @@ class TaskDispatcher:
             self._progress[task_id].state = TaskState.FAILED
 
         try:
+            from app.api.v1.endpoints.websocket import get_connection_manager
+
             await get_connection_manager().broadcast_task_failed(task_id, error)
         except Exception as e:
             logger.warning(f"Failed to broadcast task failure: {e}")
@@ -452,6 +462,8 @@ class TaskDispatcher:
         await self._session.commit()
 
         try:
+            from app.api.v1.endpoints.websocket import get_connection_manager
+
             await get_connection_manager().broadcast_task_status(
                 task_id,
                 new_state.value,
@@ -475,6 +487,8 @@ class TaskDispatcher:
             self._progress[task_id].message = message
 
         try:
+            from app.api.v1.endpoints.websocket import get_connection_manager
+
             await get_connection_manager().broadcast_task_progress(
                 task_id,
                 progress_percent,
@@ -500,22 +514,132 @@ class TaskDispatcher:
 
 # Dispatcher helpers
 
-async def default_task_handler(task: Task, update_progress: Callable) -> dict[str, Any]:
-    """Minimal deterministic executor for PM-created tasks.
+def _coerce_agent_task_type(value: object) -> AgentTaskType:
+    """Map persisted task types to the agent TaskCard enum."""
+    try:
+        return AgentTaskType(str(value))
+    except ValueError:
+        return AgentTaskType.FEATURE
 
-    It proves the lifecycle loop without mutating project files. Later phases can
-    replace this handler with Generator/Snapshot/Sandbox-backed execution.
+
+def _coerce_agent_priority(value: object) -> AgentTaskPriority:
+    """Map persisted task priorities to the agent TaskCard enum."""
+    try:
+        return AgentTaskPriority(str(value))
+    except ValueError:
+        return AgentTaskPriority.MEDIUM
+
+
+def _requirements_from_task(task: Task) -> list[RequirementSpec]:
+    """Build generator RequirementSpec objects from persisted task metadata."""
+    raw_requirements = task.structured_requirements or []
+    if isinstance(raw_requirements, dict):
+        raw_requirements = [raw_requirements]
+
+    requirements: list[RequirementSpec] = []
+    for raw in raw_requirements:
+        if not isinstance(raw, dict):
+            continue
+        req_type = raw.get("type")
+        name = raw.get("name") or raw.get("field")
+        default_value = raw.get("default")
+        if isinstance(default_value, dict) and "spec" in default_value:
+            spec = default_value.get("spec") or {}
+            constraints = default_value.get("constraints") or raw.get("constraints") or {}
+        else:
+            spec = raw.get("spec")
+            constraints = raw.get("constraints") or {}
+        if spec is None:
+            spec = {key: value for key, value in raw.items() if key not in {"field", "name", "type", "constraints"}}
+        if isinstance(req_type, str) and isinstance(name, str) and isinstance(spec, dict):
+            requirements.append(
+                RequirementSpec(
+                    type=req_type,
+                    name=name,
+                    spec=spec,
+                    constraints=constraints,
+                )
+            )
+    return requirements
+
+
+def _task_to_task_card(task: Task) -> TaskCard:
+    """Convert a persisted Task into the generator-facing TaskCard."""
+    constraints = task.constraints or {}
+    return TaskCard(
+        id=str(task.id),
+        type=_coerce_agent_task_type(task.type),
+        priority=_coerce_agent_priority(task.priority),
+        description=task.description,
+        requirements=_requirements_from_task(task),
+        structured_requirements=task.structured_requirements or [],
+        constraints=constraints,
+        target_zone=constraints.get("target_zone", "mutable"),
+        timeout_seconds=task.timeout_seconds or settings.sandbox_timeout_seconds,
+        session_id=str(task.session_id) if task.session_id else None,
+    )
+
+
+def _verify_generated_files(files: list[Any]) -> dict[str, Any]:
+    """Run deterministic in-process validation for generated code artifacts."""
+    errors: list[str] = []
+    checked_files: list[str] = []
+    for generated_file in files:
+        path = generated_file.path
+        checked_files.append(path)
+        if not generated_file.content.strip():
+            errors.append(f"{path}: generated file is empty")
+            continue
+        if path.endswith(".py"):
+            try:
+                compile(generated_file.content, path, "exec")
+            except SyntaxError as exc:
+                errors.append(f"{path}: syntax error at line {exc.lineno}: {exc.msg}")
+
+    return {
+        "success": not errors,
+        "checked_files": checked_files,
+        "errors": errors,
+    }
+
+
+async def default_task_handler(task: Task, update_progress: Callable) -> dict[str, Any]:
+    """Generate code artifacts for a task and verify the generated output.
+
+    This keeps the executor side-effect free: generated files are returned in the
+    task result for review/preview, but are not written into the project tree.
     """
     await update_progress(task.id, 25, "需求已接收，正在分析任务")
-    await update_progress(task.id, 60, "正在生成最小执行结果")
-    await update_progress(task.id, 85, "执行结果准备完成，进入验证")
+    task_card = _task_to_task_card(task)
+
+    await update_progress(task.id, 50, "正在基于任务卡生成代码")
+    generation_result = await generate_code_from_task(task_card)
+    generated_files = [
+        {
+            "path": generated_file.path,
+            "description": generated_file.description,
+            "size": len(generated_file.content),
+            "content": generated_file.content,
+        }
+        for generated_file in generation_result.files
+    ]
+
+    await update_progress(task.id, 80, "正在验证生成结果")
+    verification = _verify_generated_files(generation_result.files)
+    if not verification["success"]:
+        raise RuntimeError("Generated code validation failed: " + "; ".join(verification["errors"]))
+
+    await update_progress(task.id, 90, "生成结果验证完成")
     return {
         "success": True,
-        "output": f"Completed task lifecycle for: {task.description}",
-        "files_changed": [],
+        "output": f"Generated {len(generated_files)} file(s) for: {task.description}",
+        "generated_files": generated_files,
+        "files_changed": [file["path"] for file in generated_files],
+        "verification": verification,
         "metrics": {
-            "executor": "default_task_handler",
+            "executor": "code_generation_handler",
             "task_type": task.type,
+            "generated_file_count": len(generated_files),
         },
     }
 

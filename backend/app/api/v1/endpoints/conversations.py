@@ -26,7 +26,7 @@ from app.schemas.task import (
     TaskPriority,
     TaskType,
 )
-from app.agents.base import TaskCard
+from app.agents.base import RequirementSpec, TaskCard
 from app.agents.pm_agent.agent import PMAgent
 from app.orchestration.dispatcher.dispatcher import (
     TaskPriority as DispatcherTaskPriority,
@@ -113,6 +113,19 @@ def _task_create_from_card(task_card: TaskCard, session_id: UUID) -> TaskCreate:
     )
 
     requirements = []
+    for item in task_card.requirements or []:
+        requirement = item if isinstance(item, RequirementSpec) else RequirementSpec.model_validate(item)
+        requirements.append(
+            StructuredRequirement(
+                field=requirement.name,
+                type=requirement.type,
+                default={
+                    "spec": requirement.spec,
+                    "constraints": requirement.constraints,
+                },
+            )
+        )
+
     for item in task_card.structured_requirements or []:
         if isinstance(item, StructuredRequirement):
             requirements.append(item)

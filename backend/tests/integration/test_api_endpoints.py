@@ -14,7 +14,7 @@ import json
 from uuid import uuid4
 from httpx import AsyncClient
 
-from app.agents.base import AgentResponse, TaskCard, TaskPriority, TaskType
+from app.agents.base import AgentResponse, RequirementSpec, TaskCard, TaskPriority, TaskType
 from app.orchestration.dispatcher.dispatcher import (
     execute_submitted_task,
     session_factory_from_session,
@@ -101,6 +101,9 @@ class TestTaskEndpoints:
 
         task = await _wait_for_task_status(client, data["id"], "completed")
         assert task["result"]["success"] is True
+        assert task["result"]["generated_files"]
+        assert task["result"]["generated_files"][0]["path"] == "app/services/generic_service.py"
+        assert task["result"]["verification"]["success"] is True
 
     async def test_get_task_by_id(self, client: AsyncClient, test_task):
         """
@@ -377,6 +380,18 @@ class TestConversationEndpoints:
                     type=TaskType.FEATURE,
                     priority=TaskPriority.HIGH,
                     description="Implement dashboard analytics for active users",
+                    requirements=[
+                        RequirementSpec(
+                            type="api",
+                            name="dashboard_metrics_api",
+                            spec={
+                                "model": "DashboardMetrics",
+                                "endpoints": [
+                                    {"path": "/dashboard/metrics", "method": "GET", "name": "list_metrics"}
+                                ],
+                            },
+                        )
+                    ],
                     structured_requirements=[
                         {"field": "metric", "type": "text", "default": "active_users"}
                     ],
@@ -415,6 +430,10 @@ class TestConversationEndpoints:
         assert tasks[0]["description"] == "Implement dashboard analytics for active users"
         assert tasks[0]["status"] == "completed"
         assert tasks[0]["result"]["success"] is True
+        assert any(
+            file["path"] == "app/api/dashboardmetrics_router.py"
+            for file in tasks[0]["result"]["generated_files"]
+        )
 
     async def test_send_message_runs_created_task_lifecycle_to_completion(
         self,

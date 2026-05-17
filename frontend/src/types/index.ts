@@ -38,10 +38,19 @@ export interface TaskConstraints {
   timeout_seconds: number;
 }
 
+export interface GeneratedFileResult {
+  path: string;
+  description?: string;
+  size: number;
+  content: string;
+}
+
 export interface TaskResult {
   success: boolean;
   output?: string;
   files_changed: string[];
+  generated_files?: GeneratedFileResult[];
+  verification?: Record<string, any>;
   snapshot_id?: string;
   metrics?: Record<string, any>;
 }

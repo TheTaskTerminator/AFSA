@@ -86,6 +86,8 @@ class TaskResult(BaseModel):
     success: bool
     output: Optional[str] = None
     files_changed: List[str] = Field(default_factory=list)
+    generated_files: List[Dict[str, Any]] = Field(default_factory=list)
+    verification: Optional[Dict[str, Any]] = None
     snapshot_id: Optional[str] = None
     metrics: Optional[Dict[str, Any]] = None
 

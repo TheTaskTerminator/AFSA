@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { clsx } from 'clsx';
 import {
   Play,
@@ -20,7 +20,6 @@ interface Step {
 interface StepGuideProps {
   currentStep: number;
   totalSteps: number;
-  onStepComplete?: () => void;
   onNext?: () => void;
   onRestart?: () => void;
 }
@@ -73,7 +72,6 @@ const steps: Step[] = [
 export const StepGuide: React.FC<StepGuideProps> = ({
   currentStep,
   totalSteps,
-  onStepComplete,
   onNext,
   onRestart,
 }) => {

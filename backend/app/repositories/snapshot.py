@@ -43,7 +43,7 @@ class SnapshotRepository:
             parent_id=parent_id,
             tree_hash=tree_hash,
             message=message,
-            metadata=metadata,
+            snap_metadata=metadata,
         )
         self.session.add(snapshot)
         await self.session.flush()

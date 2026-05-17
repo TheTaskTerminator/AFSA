@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useConversationStore, useTaskStore, useUIStore } from './store';
-import { wsClient } from './lib/api';
+import { apiClient, wsClient } from './lib/api';
 import {
   MessageList,
   MessageInput,
@@ -23,10 +23,23 @@ import {
   Eye,
   PanelLeft,
   PanelRight,
-  Maximize2,
-  Minimize2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import type { TaskStatus } from './types';
+
+const TASK_STATUSES: ReadonlySet<TaskStatus> = new Set([
+  'pending',
+  'queued',
+  'running',
+  'verifying',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+function isTaskStatus(value: unknown): value is TaskStatus {
+  return typeof value === 'string' && TASK_STATUSES.has(value as TaskStatus);
+}
 
 function App() {
   const {
@@ -39,9 +52,10 @@ function App() {
     useUIStore();
   
   const { isTaskPanelOpen, toggleTaskPanel } = useUIStore();
+  const { addTask, updateTask } = useTaskStore();
   
   const [activeTab, setActiveTab] = useState<'conversation' | 'tasks' | 'preview'>('conversation');
-  const [isMobile, setIsMobile] = useState(false);
+  const [, setIsMobile] = useState(false);
 
   // 检测移动设备
   useEffect(() => {
@@ -60,21 +74,40 @@ function App() {
 
     // 监听 WebSocket 消息
     const unsubscribe = wsClient.onMessage((message) => {
-      console.log('Received WebSocket message:', message);
-      
-      // 根据消息类型处理
+      // Backend WebSocket is task-event only; conversation messages use HTTP.
+      const taskId = message.data?.task_id;
       switch (message.type) {
-        case 'message':
-          // 处理新消息
+        case 'task_created':
+          if (typeof taskId === 'string') {
+            apiClient.getTask(taskId).then(addTask).catch(console.error);
+          }
           break;
-        case 'task_update':
-          // 处理任务更新
+        case 'task_progress':
+        case 'task_status':
+          if (typeof taskId === 'string' && isTaskStatus(message.data.status)) {
+            updateTask(taskId, {
+              status: message.data.status,
+            });
+          }
           break;
-        case 'code_change':
-          // 处理代码变更
+        case 'task_completed':
+          if (typeof taskId === 'string') {
+            updateTask(taskId, {
+              status: 'completed',
+              result: message.data.result,
+            });
+          }
           break;
-        case 'ui_change':
-          // 处理 UI 变更
+        case 'task_failed':
+          if (typeof taskId === 'string') {
+            updateTask(taskId, {
+              status: 'failed',
+              error_message: message.data.error,
+            });
+          }
+          break;
+        case 'pong':
+        case 'error':
           break;
       }
     });

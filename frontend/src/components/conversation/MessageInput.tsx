@@ -1,6 +1,6 @@
 import React, { useState, KeyboardEvent } from 'react';
-import { useConversationStore } from '../../store';
-import { wsClient } from '../../lib/api';
+import { useConversationStore, useTaskStore } from '../../store';
+import { apiClient, wsClient } from '../../lib/api';
 import { Message } from '../../types';
 import { clsx } from 'clsx';
 import { Send, Paperclip } from 'lucide-react';
@@ -20,8 +20,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     addMessage,
     updateMessageStatus,
     createConversation,
-    isLoading,
   } = useConversationStore();
+  const addTask = useTaskStore((state) => state.addTask);
   const [isSending, setIsSending] = useState(false);
 
   const sendMessage = async () => {
@@ -33,56 +33,47 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
     // 创建临时消息 ID
     const tempId = crypto.randomUUID();
-    
-    // 如果没有当前对话，创建一个新对话
+    let tempMessageAdded = false;
     let conversationId = currentConversationId;
-    if (!conversationId) {
-      const title = messageContent.slice(0, 50) + (messageContent.length > 50 ? '...' : '');
-      createConversation(title);
-      // 获取新创建的对话 ID（从 store 中）
-      conversationId = tempId; // 这里简化处理，实际应该从 store 获取
-    }
-
-    // 创建临时消息
-    const tempMessage: Message = {
-      id: tempId,
-      role: 'user',
-      content: messageContent,
-      timestamp: Date.now(),
-      status: 'sending',
-    };
-
-    addMessage(tempMessage);
 
     try {
-      // 通过 WebSocket 发送消息
-      if (wsClient.isConnected()) {
-        wsClient.send({
-          type: 'message',
-          payload: {
-            conversationId,
-            content: messageContent,
-          },
-        });
-      } else {
-        // 降级处理：直接添加到消息列表
-        updateMessageStatus(tempId, 'sent');
-        
-        // 模拟 AI 响应（实际应该从服务器获取）
-        setTimeout(() => {
-          const aiMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: '收到您的消息：' + messageContent,
-            timestamp: Date.now(),
-            status: 'sent',
-          };
-          addMessage(aiMessage);
-        }, 1000);
+      // 如果没有当前对话，先创建后端会话，再写入本地会话列表
+      if (!conversationId) {
+        const title = messageContent.slice(0, 50) + (messageContent.length > 50 ? '...' : '');
+        const session = await apiClient.createConversation();
+        conversationId = createConversation(title, session.id);
+      }
+
+      // 创建临时消息
+      const tempMessage: Message = {
+        id: tempId,
+        role: 'user',
+        content: messageContent,
+        timestamp: Date.now(),
+        status: 'sending',
+      };
+
+      addMessage(tempMessage);
+      tempMessageAdded = true;
+
+      // Conversation messages are sent via HTTP; backend WebSocket only supports task events.
+      const response = await apiClient.sendConversationMessage(conversationId, messageContent);
+      updateMessageStatus(tempId, 'sent');
+      addMessage(response);
+
+      const taskId = response.metadata?.task_id;
+      if (typeof taskId === 'string') {
+        const task = await apiClient.getTask(taskId);
+        addTask(task);
+        wsClient.subscribeTask(taskId);
       }
     } catch (error) {
       console.error('Failed to send message:', error);
-      updateMessageStatus(tempId, 'error');
+      if (tempMessageAdded) {
+        updateMessageStatus(tempId, 'error');
+      } else {
+        setInput(messageContent);
+      }
     } finally {
       setIsSending(false);
     }

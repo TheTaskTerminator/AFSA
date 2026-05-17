@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTaskStore } from '../../store';
+import { Task, TaskStatus } from '../../types';
 import { clsx } from 'clsx';
 import {
   X,
@@ -17,27 +18,38 @@ interface TaskDetailPanelProps {
   onClose?: () => void;
 }
 
-const statusConfig = {
-  pending: {
-    icon: Circle,
-    label: '等待中',
-    color: 'text-gray-500 bg-gray-100',
-  },
-  in_progress: {
-    icon: Play,
-    label: '进行中',
-    color: 'text-blue-500 bg-blue-100',
-  },
-  completed: {
-    icon: CheckCircle,
-    label: '已完成',
-    color: 'text-green-500 bg-green-100',
-  },
-  failed: {
-    icon: AlertCircle,
-    label: '失败',
-    color: 'text-red-500 bg-red-100',
-  },
+const statusConfig: Record<TaskStatus, {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  color: string;
+}> = {
+  pending: { icon: Circle, label: '等待中', color: 'text-gray-500 bg-gray-100' },
+  queued: { icon: Clock, label: '队列中', color: 'text-gray-500 bg-gray-100' },
+  running: { icon: Play, label: '运行中', color: 'text-blue-500 bg-blue-100' },
+  verifying: { icon: Play, label: '验证中', color: 'text-indigo-500 bg-indigo-100' },
+  completed: { icon: CheckCircle, label: '已完成', color: 'text-green-500 bg-green-100' },
+  failed: { icon: AlertCircle, label: '失败', color: 'text-red-500 bg-red-100' },
+  cancelled: { icon: AlertCircle, label: '已取消', color: 'text-yellow-600 bg-yellow-100' },
+};
+
+const isActiveTask = (status: TaskStatus) => status === 'running' || status === 'verifying';
+const getTaskTitle = (task: Task) => task.description.split('\n')[0] || task.id;
+const getTaskProgress = (task: Task) => {
+  if (task.status === 'completed') return 100;
+  if (task.status === 'verifying') return 80;
+  if (task.status === 'running') return 50;
+  return 0;
+};
+const getTaskTimestamp = (task: Task, kind: 'created' | 'updated') => {
+  if (kind === 'created') {
+    return task.createdAt ?? (task.created_at ? Date.parse(task.created_at) : Date.now());
+  }
+  return task.completedAt ??
+    (task.completed_at ? Date.parse(task.completed_at) : undefined) ??
+    task.startedAt ??
+    (task.started_at ? Date.parse(task.started_at) : undefined) ??
+    task.createdAt ??
+    (task.created_at ? Date.parse(task.created_at) : Date.now());
 };
 
 export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
@@ -95,7 +107,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* 标题和状态 */}
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-3">{task.title}</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-3">{getTaskTitle(task)}</h2>
           <div className="flex items-center gap-3">
             <span
               className={clsx(
@@ -116,18 +128,18 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         </div>
 
         {/* 进度 */}
-        {task.status === 'in_progress' && (
+        {isActiveTask(task.status) && (
           <div>
             <h4 className="text-sm font-medium text-gray-700 mb-2">进度</h4>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <span>完成度</span>
-                <span className="font-medium">{task.progress}%</span>
+                <span className="font-medium">{getTaskProgress(task)}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
                   className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${task.progress}%` }}
+                  style={{ width: `${getTaskProgress(task)}%` }}
                 />
               </div>
             </div>
@@ -140,7 +152,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             <h4 className="text-sm font-medium text-gray-700 mb-2">结果</h4>
             <div className="bg-gray-50 rounded-lg p-4">
               <pre className="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
-                {task.result}
+                {task.result.output ?? JSON.stringify(task.result, null, 2)}
               </pre>
             </div>
           </div>
@@ -151,12 +163,12 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           <div className="flex items-center gap-3 text-sm text-gray-500">
             <Calendar className="w-4 h-4" />
             <span>创建时间：</span>
-            <span>{new Date(task.createdAt).toLocaleString('zh-CN')}</span>
+            <span>{new Date(getTaskTimestamp(task, 'created')).toLocaleString('zh-CN')}</span>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-500">
             <Clock className="w-4 h-4" />
             <span>更新时间：</span>
-            <span>{new Date(task.updatedAt).toLocaleString('zh-CN')}</span>
+            <span>{new Date(getTaskTimestamp(task, 'updated')).toLocaleString('zh-CN')}</span>
           </div>
         </div>
       </div>

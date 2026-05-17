@@ -1,6 +1,8 @@
 // AFSA Demo Module
 // 演示模式入口文件
 
+import { DemoPage } from './DemoPage';
+
 export { DemoPage } from './DemoPage';
 export { DemoModeToggle, DemoControls } from './DemoModeToggle';
 export { StepGuide } from './StepGuide';

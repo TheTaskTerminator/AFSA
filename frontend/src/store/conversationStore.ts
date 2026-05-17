@@ -13,7 +13,7 @@ interface ConversationState {
   setCurrentConversation: (id: string) => void;
   addMessage: (message: Message) => void;
   updateMessageStatus: (messageId: string, status: Message['status']) => void;
-  createConversation: (title: string) => void;
+  createConversation: (title: string, id?: string) => string;
   deleteConversation: (id: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -56,20 +56,24 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     )
   })),
   
-  createConversation: (title) => set((state) => {
-    const newConversation: Conversation = {
-      id: crypto.randomUUID(),
-      title,
-      messages: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    return {
-      conversations: [newConversation, ...state.conversations],
-      currentConversationId: newConversation.id,
-      messages: [],
-    };
-  }),
+  createConversation: (title, id) => {
+    const conversationId = id ?? crypto.randomUUID();
+    set((state) => {
+      const newConversation: Conversation = {
+        id: conversationId,
+        title,
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      return {
+        conversations: [newConversation, ...state.conversations],
+        currentConversationId: newConversation.id,
+        messages: [],
+      };
+    });
+    return conversationId;
+  },
   
   deleteConversation: (id) => set((state) => ({
     conversations: state.conversations.filter(c => c.id !== id),

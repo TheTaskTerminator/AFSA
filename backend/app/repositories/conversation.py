@@ -135,7 +135,7 @@ class ConversationRepository:
             session_id=session_id,
             role=role,
             content=content,
-            metadata=metadata,
+            msg_metadata=metadata,
         )
         self.session.add(message)
         await self.session.flush()

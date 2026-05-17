@@ -17,14 +17,17 @@ class ConversationSession(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "conversation_sessions"
 
     user_id: Mapped[Optional[UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+        PG_UUID(as_uuid=True), nullable=True
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     messages: Mapped[list["ConversationMessage"]] = relationship(
-        "ConversationMessage", back_populates="session", cascade="all, delete-orphan"
+        "ConversationMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
 

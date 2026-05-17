@@ -1,16 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
 import {
-  MessageSquare,
   Send,
   Bot,
-  User,
-  Sparkles,
   CheckCircle,
-  Clock,
-  Code,
   FileText,
-  Play,
 } from 'lucide-react';
 
 interface DemoMessage {
@@ -119,12 +113,12 @@ export const DemoContent: React.FC<DemoContentProps> = ({
 }) => {
   const [messages, setMessages] = useState<DemoMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [messageIndex, setMessageIndex] = useState(0);
+
 
   useEffect(() => {
     const stepMessages = demoMessages[currentStep] || [];
     setMessages([]);
-    setMessageIndex(0);
+
 
     if (stepMessages.length > 0) {
       displayMessagesSequentially(stepMessages);
@@ -137,7 +131,7 @@ export const DemoContent: React.FC<DemoContentProps> = ({
       await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 500));
       setIsTyping(false);
       setMessages((prev) => [...prev, msgs[i]]);
-      setMessageIndex(i + 1);
+
     }
 
     // 自动完成步骤

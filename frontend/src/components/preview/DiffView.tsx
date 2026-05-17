@@ -142,7 +142,7 @@ export const DiffView: React.FC<DiffViewProps> = ({ className }) => {
         <DiffSection
           key={change.id}
           title={change.filePath}
-          oldContent={change.oldContent}
+          oldContent={change.oldContent ?? ''}
           newContent={change.newContent}
         />
       ))}

@@ -7,7 +7,6 @@ import {
   Trash2,
   Search,
   X,
-  Menu,
 } from 'lucide-react';
 
 interface ConversationSidebarProps {

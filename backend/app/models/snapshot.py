@@ -29,10 +29,10 @@ class Snapshot(Base):
 
     # Relationships
     children: Mapped[list["Snapshot"]] = relationship(
-        "Snapshot", back_populates="parent", remote_side=[id]
+        "Snapshot", back_populates="parent", lazy="selectin"
     )
     parent: Mapped[Optional["Snapshot"]] = relationship(
-        "Snapshot", back_populates="children", remote_side=[parent_id]
+        "Snapshot", back_populates="children", remote_side=[id]
     )
 
 

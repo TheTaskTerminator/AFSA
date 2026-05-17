@@ -6,6 +6,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
+  metadata?: Record<string, any>;
   status?: 'sending' | 'sent' | 'error';
 }
 
@@ -45,6 +46,26 @@ export interface TaskResult {
   metrics?: Record<string, any>;
 }
 
+export interface CodeChange {
+  id: string;
+  filePath: string;
+  oldContent?: string;
+  newContent: string;
+  diff?: string;
+  language?: string;
+  timestamp: number;
+}
+
+export interface UIChange {
+  id: string;
+  component: string;
+  description: string;
+  before?: string;
+  after?: string;
+  previewUrl?: string;
+  timestamp: number;
+}
+
 export interface Task {
   id: string;
   type: TaskType;
@@ -57,9 +78,12 @@ export interface Task {
   error_message?: string;
   user_id?: string;
   session_id?: string;
-  createdAt: number;
+  createdAt?: number;
   startedAt?: number;
   completedAt?: number;
+  created_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
   timeout_seconds: number;
 }
 

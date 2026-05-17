@@ -72,6 +72,9 @@ class TaskCard(BaseModel):
     
     # 结构化需求
     requirements: List[RequirementSpec] = Field(default_factory=list)
+    # Backwards-compatible fields used by current agent implementations/tests.
+    structured_requirements: List[Dict[str, Any]] = Field(default_factory=list)
+    constraints: Dict[str, Any] = Field(default_factory=dict)
     
     # 约束条件
     target_zone: str = "mutable"
@@ -120,6 +123,8 @@ class AgentResponse(BaseModel):
     content: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None
+    clarification_questions: List[Any] = Field(default_factory=list)
+    task_card: Optional[TaskCard] = None
     
     @classmethod
     def ok(cls, content: str, metadata: Optional[Dict[str, Any]] = None) -> "AgentResponse":

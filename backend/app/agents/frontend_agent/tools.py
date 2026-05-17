@@ -212,7 +212,7 @@ class CodeGenerationTool:
 {{
   "files": [
     {{
-      "path": "src/hooks/use{name}Api.ts",
+      "path": "src/hooks/useResourceApi.ts",
       "content": "代码内容",
       "description": "API Hook 文件"
     }}
@@ -395,11 +395,17 @@ class CodeValidationTool:
 
         # Check for buttons without accessible name
         if "<button" in code:
-            button_pattern = r"<button[^>]*>(.*?)</button>"
+            empty_button_pattern = r"<button\b(?:(?!aria-label=|aria-labelledby=|title=)[\s\S])*?></button>"
+            if re.search(empty_button_pattern, code, re.DOTALL):
+                errors.append("Empty button is missing an accessible name")
+
+            button_pattern = r"<button\b[^>]*>(.*?)</button>"
             buttons = re.findall(button_pattern, code, re.DOTALL)
             for button_content in buttons:
                 if not button_content.strip():
-                    errors.append("发现空按钮，缺少可访问名称")
+                    message = "Empty button is missing an accessible name"
+                    if message not in errors:
+                        errors.append(message)
 
         # Check for form inputs without labels
         if "<input" in code or "<textarea" in code:

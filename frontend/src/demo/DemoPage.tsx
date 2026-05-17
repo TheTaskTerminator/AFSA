@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
 import {
-  MonitorPlay,
   X,
-  Play,
-  Pause,
-  SkipForward,
-  RotateCcw,
   ChevronRight,
-  CheckCircle,
   Code,
   FileText,
   Eye,
@@ -16,7 +10,7 @@ import {
 } from 'lucide-react';
 import { StepGuide } from './StepGuide';
 import { DemoContent } from './DemoContent';
-import { DemoModeToggle, DemoControls } from './DemoModeToggle';
+import { DemoControls } from './DemoModeToggle';
 
 interface DemoPageProps {
   onClose?: () => void;

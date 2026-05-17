@@ -13,6 +13,8 @@ import json
 from uuid import uuid4
 from httpx import AsyncClient
 
+from app.agents.base import AgentResponse, TaskCard, TaskPriority, TaskType
+
 
 @pytest.mark.asyncio
 class TestTaskEndpoints:
@@ -308,6 +310,59 @@ class TestConversationEndpoints:
         
         # Note: May fail if PM Agent is not mocked, but endpoint should exist
         assert response.status_code in [200, 500]
+
+    async def test_send_message_creates_task_when_pm_returns_task_card(
+        self,
+        client: AsyncClient,
+        test_conversation,
+        monkeypatch,
+    ):
+        """Conversation message should become a persisted task when PM emits a task card."""
+        import app.api.v1.endpoints.conversations as conversations_module
+
+        class FakePMAgent:
+            async def process_message(self, session_id, message, context=None):
+                task_card = TaskCard(
+                    type=TaskType.FEATURE,
+                    priority=TaskPriority.HIGH,
+                    description="Implement dashboard analytics for active users",
+                    structured_requirements=[
+                        {"field": "metric", "type": "text", "default": "active_users"}
+                    ],
+                    constraints={
+                        "target_zone": "mutable",
+                        "affected_modules": ["dashboard"],
+                        "timeout_seconds": 120,
+                    },
+                )
+                return AgentResponse(
+                    success=True,
+                    content="已生成任务并进入执行队列。",
+                    task_card=task_card,
+                    metadata={"type": "task_card", "session_id": str(session_id)},
+                )
+
+        monkeypatch.setattr(conversations_module, "_pm_agent", FakePMAgent())
+
+        response = await client.post(
+            f"/api/v1/conversations/{test_conversation.id}/messages",
+            json={"content": "Add active-user analytics to the dashboard"},
+        )
+
+        assert response.status_code == 200
+        assistant_message = response.json()
+        assert assistant_message["metadata"]["has_task_card"] is True
+        assert assistant_message["metadata"]["task_id"]
+
+        tasks_response = await client.get(
+            f"/api/v1/tasks?session_id={test_conversation.id}"
+        )
+        assert tasks_response.status_code == 200
+        tasks = tasks_response.json()
+        assert len(tasks) == 1
+        assert tasks[0]["id"] == assistant_message["metadata"]["task_id"]
+        assert tasks[0]["description"] == "Implement dashboard analytics for active users"
+        assert tasks[0]["status"] in {"pending", "queued"}
 
     async def test_get_messages(self, client: AsyncClient, test_conversation):
         """

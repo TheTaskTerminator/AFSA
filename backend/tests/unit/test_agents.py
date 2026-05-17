@@ -141,7 +141,7 @@ class TestAgentResponse:
         )
         assert response.success is True
         assert response.content == "Task completed"
-        assert response.metadata is None
+        assert response.metadata == {}
 
     def test_agent_response_with_metadata(self):
         """Test agent response with metadata."""

@@ -54,12 +54,36 @@ class ZoneViolation:
 
 @dataclass
 class FeasibilityResult:
-    """Result of feasibility analysis."""
-    score: int  # 1-10
-    complexity: str  # Simple, Medium, Complex
-    required_technologies: List[str]
-    potential_blockers: List[str]
-    recommended_approach: str
+    """Result of feasibility analysis.
+
+    Keeps the newer score-based fields while accepting older collaboration-test
+    fields such as feasible/estimated_effort/rejection_reason.
+    """
+    score: int = 8  # 1-10
+    complexity: str = "Medium"  # Simple, Medium, Complex
+    required_technologies: List[str] = field(default_factory=list)
+    potential_blockers: List[str] = field(default_factory=list)
+    recommended_approach: str = ""
+    feasible: bool = True
+    estimated_effort: Optional[str] = None
+    technical_risks: List[str] = field(default_factory=list)
+    recommended_architecture: Dict[str, Any] = field(default_factory=dict)
+    dependencies: List[str] = field(default_factory=list)
+    migration_required: bool = False
+    rejection_reason: Optional[str] = None
+    alternative_approach: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if not self.feasible and self.score >= 3:
+            self.score = 2
+        if self.technical_risks and not self.potential_blockers:
+            self.potential_blockers = list(self.technical_risks)
+        if self.recommended_architecture and not self.required_technologies:
+            technologies = self.recommended_architecture.get("technologies")
+            if isinstance(technologies, list):
+                self.required_technologies = technologies
+        if self.alternative_approach and not self.recommended_approach:
+            self.recommended_approach = self.alternative_approach
 
 
 @dataclass

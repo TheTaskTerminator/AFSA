@@ -8,6 +8,7 @@ import {
   CheckCircle,
   AlertCircle,
   ListFilter,
+  Clock,
 } from 'lucide-react';
 
 interface TaskFilterProps {
@@ -22,9 +23,12 @@ const filterOptions: Array<{
 }> = [
   { value: 'all', label: '全部', icon: ListFilter, color: 'text-gray-600' },
   { value: 'pending', label: '等待中', icon: Circle, color: 'text-gray-500' },
-  { value: 'in_progress', label: '进行中', icon: Play, color: 'text-blue-500' },
+  { value: 'queued', label: '队列中', icon: Clock, color: 'text-gray-500' },
+  { value: 'running', label: '运行中', icon: Play, color: 'text-blue-500' },
+  { value: 'verifying', label: '验证中', icon: Play, color: 'text-indigo-500' },
   { value: 'completed', label: '已完成', icon: CheckCircle, color: 'text-green-500' },
   { value: 'failed', label: '失败', icon: AlertCircle, color: 'text-red-500' },
+  { value: 'cancelled', label: '已取消', icon: AlertCircle, color: 'text-yellow-600' },
 ];
 
 export const TaskFilter: React.FC<TaskFilterProps> = ({ className }) => {

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.models.conversation import ConversationMessage, ConversationSession
 from app.repositories.conversation import ConversationRepository
+from app.repositories.task import TaskRepository
 from app.schemas.conversation import (
     MessageCreate,
     MessageRead,
@@ -18,6 +19,14 @@ from app.schemas.conversation import (
     SessionStatus,
     SessionSummary,
 )
+from app.schemas.task import (
+    StructuredRequirement,
+    TaskConstraints,
+    TaskCreate,
+    TaskPriority,
+    TaskType,
+)
+from app.agents.base import TaskCard
 from app.agents.pm_agent.agent import PMAgent
 
 router = APIRouter()
@@ -61,6 +70,48 @@ def _session_to_summary(session: ConversationSession, message_count: int = 0) ->
         updated_at=session.updated_at,
         expires_at=session.expires_at,
         message_count=message_count,
+    )
+
+
+def _coerce_task_type(value: object) -> TaskType:
+    """Map agent task-card types onto the API task schema."""
+    try:
+        return TaskType(str(getattr(value, "value", value)))
+    except ValueError:
+        return TaskType.FEATURE
+
+
+def _coerce_task_priority(value: object) -> TaskPriority:
+    """Map agent task-card priorities onto the API task schema."""
+    try:
+        return TaskPriority(str(getattr(value, "value", value)))
+    except ValueError:
+        return TaskPriority.MEDIUM
+
+
+def _task_create_from_card(task_card: TaskCard, session_id: UUID) -> TaskCreate:
+    """Convert a PM Agent task card into the single persisted task representation."""
+    raw_constraints = task_card.constraints or {}
+    constraints = TaskConstraints(
+        target_zone=raw_constraints.get("target_zone", task_card.target_zone),
+        affected_modules=raw_constraints.get("affected_modules", []),
+        timeout_seconds=raw_constraints.get("timeout_seconds", task_card.timeout_seconds),
+    )
+
+    requirements = []
+    for item in task_card.structured_requirements or []:
+        if isinstance(item, StructuredRequirement):
+            requirements.append(item)
+        elif isinstance(item, dict) and "field" in item and "type" in item:
+            requirements.append(StructuredRequirement.model_validate(item))
+
+    return TaskCreate(
+        type=_coerce_task_type(task_card.type),
+        priority=_coerce_task_priority(task_card.priority),
+        description=task_card.description,
+        structured_requirements=requirements,
+        constraints=constraints,
+        session_id=session_id,
     )
 
 
@@ -201,20 +252,36 @@ async def send_message(
         context=message.metadata,
     )
 
+    created_task = None
+    if agent_response.task_card is not None:
+        task_repo = TaskRepository(db)
+        created_task = await task_repo.create(
+            _task_create_from_card(agent_response.task_card, session_id)
+        )
+
     # Store assistant response
+    assistant_metadata = {
+        "success": agent_response.success,
+        "clarification_questions": agent_response.clarification_questions,
+        "has_task_card": agent_response.task_card is not None,
+    }
+    if created_task is not None:
+        assistant_metadata.update({
+            "task_id": str(created_task.id),
+            "task_status": created_task.status,
+        })
+
     assistant_msg = await repo.add_message(
         session_id=session_id,
         role=MessageRole.ASSISTANT.value,
         content=agent_response.content,
-        metadata={
-            "success": agent_response.success,
-            "clarification_questions": agent_response.clarification_questions,
-            "has_task_card": agent_response.task_card is not None,
-        },
+        metadata=assistant_metadata,
     )
 
     await db.commit()
     await db.refresh(assistant_msg)
+    if created_task is not None:
+        await db.refresh(created_task)
 
     return _message_to_read(assistant_msg)
 

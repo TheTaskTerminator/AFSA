@@ -78,6 +78,12 @@ def mock_pool(mock_sandbox_instance):
     return pool
 
 
+@pytest.fixture
+def runner(mock_pool):
+    """Create a SandboxRunner with mock pool for tests outside TestSandboxRunner."""
+    return SandboxRunner(pool=mock_pool)
+
+
 # ============= SandboxRunner Tests =============
 
 class TestSandboxRunner:

@@ -30,7 +30,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   setTasks: (tasks) => set({ tasks }),
   
   addTask: (task) => set((state) => ({
-    tasks: [task, ...state.tasks]
+    tasks: state.tasks.some((existing) => existing.id === task.id)
+      ? state.tasks.map((existing) => existing.id === task.id ? { ...existing, ...task } : existing)
+      : [task, ...state.tasks]
   })),
   
   updateTask: (id, updates) => set((state) => ({

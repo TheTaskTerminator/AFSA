@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTaskStore } from '../../store';
-import { Task } from '../../types';
+import { Task, TaskStatus } from '../../types';
 import { clsx } from 'clsx';
 import {
   CheckCircle,
@@ -15,26 +15,51 @@ interface TaskListProps {
   onTaskSelect?: (task: Task) => void;
 }
 
-const statusIcons = {
+const statusIcons: Record<TaskStatus, React.ComponentType<{ className?: string }>> = {
   pending: Circle,
-  in_progress: Play,
+  queued: Clock,
+  running: Play,
+  verifying: Play,
   completed: CheckCircle,
   failed: AlertCircle,
+  cancelled: AlertCircle,
 };
 
-const statusColors = {
+const statusColors: Record<TaskStatus, string> = {
   pending: 'text-gray-500 bg-gray-100',
-  in_progress: 'text-blue-500 bg-blue-100',
+  queued: 'text-gray-500 bg-gray-100',
+  running: 'text-blue-500 bg-blue-100',
+  verifying: 'text-indigo-500 bg-indigo-100',
   completed: 'text-green-500 bg-green-100',
   failed: 'text-red-500 bg-red-100',
+  cancelled: 'text-yellow-600 bg-yellow-100',
 };
 
-const statusLabels = {
+const statusLabels: Record<TaskStatus, string> = {
   pending: '等待中',
-  in_progress: '进行中',
+  queued: '队列中',
+  running: '运行中',
+  verifying: '验证中',
   completed: '已完成',
   failed: '失败',
+  cancelled: '已取消',
 };
+
+const isActiveTask = (status: TaskStatus) => status === 'running' || status === 'verifying';
+const getTaskTitle = (task: Task) => task.description.split('\n')[0] || task.id;
+const getTaskProgress = (task: Task) => {
+  if (task.status === 'completed') return 100;
+  if (task.status === 'verifying') return 80;
+  if (task.status === 'running') return 50;
+  return 0;
+};
+const getTaskTimestamp = (task: Task) =>
+  task.completedAt ??
+  (task.completed_at ? Date.parse(task.completed_at) : undefined) ??
+  task.startedAt ??
+  (task.started_at ? Date.parse(task.started_at) : undefined) ??
+  task.createdAt ??
+  (task.created_at ? Date.parse(task.created_at) : Date.now());
 
 const TaskItem: React.FC<{ task: Task; onSelect: (task: Task) => void }> = ({
   task,
@@ -62,22 +87,22 @@ const TaskItem: React.FC<{ task: Task; onSelect: (task: Task) => void }> = ({
         </div>
         
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-gray-900 truncate">{task.title}</h3>
+          <h3 className="font-medium text-gray-900 truncate">{getTaskTitle(task)}</h3>
           <p className="text-sm text-gray-500 mt-1 line-clamp-2">
             {task.description}
           </p>
           
           {/* 进度条 */}
-          {task.status === 'in_progress' && (
+          {isActiveTask(task.status) && (
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                 <span>进度</span>
-                <span>{task.progress}%</span>
+                <span>{getTaskProgress(task)}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
                   className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${task.progress}%` }}
+                  style={{ width: `${getTaskProgress(task)}%` }}
                 />
               </div>
             </div>
@@ -94,7 +119,7 @@ const TaskItem: React.FC<{ task: Task; onSelect: (task: Task) => void }> = ({
               {statusLabels[task.status]}
             </span>
             <span className="text-xs text-gray-400">
-              {new Date(task.updatedAt).toLocaleString()}
+              {new Date(getTaskTimestamp(task)).toLocaleString()}
             </span>
           </div>
         </div>

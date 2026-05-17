@@ -23,7 +23,7 @@ export interface Conversation {
 
 export type TaskType = 'feature' | 'bugfix' | 'refactor' | 'test' | 'doc';
 export type TaskPriority = 'low' | 'medium' | 'high';
-export type TaskStatus = 'pending' | 'queued' | 'running' | 'verifying' | 'completed' | 'failed' | 'cancelled';
+export type TaskStatus = 'pending' | 'queued' | 'running' | 'verifying' | 'completed' | 'failed' | 'cancelled' | 'timeout';
 
 export interface StructuredRequirement {
   field: string;

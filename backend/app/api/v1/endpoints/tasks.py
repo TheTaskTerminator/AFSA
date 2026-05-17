@@ -3,7 +3,7 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -16,7 +16,12 @@ from app.schemas.task import (
     TaskStatus,
     TaskUpdate,
 )
-from app.orchestration.dispatcher.dispatcher import get_task_dispatcher
+from app.orchestration.dispatcher.dispatcher import (
+    TaskPriority as DispatcherTaskPriority,
+    execute_submitted_task,
+    get_task_dispatcher,
+    session_factory_from_session,
+)
 
 router = APIRouter()
 
@@ -24,6 +29,14 @@ router = APIRouter()
 def _task_to_read(task: Task) -> TaskRead:
     """Convert Task model to TaskRead schema."""
     return TaskRead.model_validate(task)
+
+
+def _dispatcher_priority(value: object) -> DispatcherTaskPriority:
+    """Map task API priorities onto dispatcher priorities."""
+    try:
+        return DispatcherTaskPriority(str(getattr(value, "value", value)))
+    except ValueError:
+        return DispatcherTaskPriority.MEDIUM
 
 
 async def get_task_repo(db: AsyncSession = Depends(get_db)) -> TaskRepository:
@@ -34,6 +47,7 @@ async def get_task_repo(db: AsyncSession = Depends(get_db)) -> TaskRepository:
 @router.post("", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
 async def create_task(
     task: TaskCreate,
+    background_tasks: BackgroundTasks,
     repo: TaskRepository = Depends(get_task_repo),
     db: AsyncSession = Depends(get_db),
 ) -> TaskRead:
@@ -51,10 +65,14 @@ async def create_task(
     if task.session_id:
         try:
             dispatcher = await get_task_dispatcher(db)
-            priority = TaskPriority(task.priority.value) if task.priority else TaskPriority.MEDIUM
-            await dispatcher.submit(db_task.id, priority)
+            await dispatcher.submit(db_task.id, _dispatcher_priority(task.priority))
             await db.commit()
             await db.refresh(db_task)
+            background_tasks.add_task(
+                execute_submitted_task,
+                session_factory_from_session(db),
+                db_task.id,
+            )
         except Exception:
             # Log but don't fail creation if dispatcher fails
             pass
@@ -100,6 +118,7 @@ async def list_tasks(
 async def get_task(
     task_id: UUID,
     repo: TaskRepository = Depends(get_task_repo),
+    db: AsyncSession = Depends(get_db),
 ) -> TaskRead:
     """Get task by ID.
 
@@ -111,6 +130,7 @@ async def get_task(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task not found: {task_id}",
         )
+    await db.refresh(task)
     return _task_to_read(task)
 
 
@@ -183,6 +203,7 @@ async def cancel_task(
 @router.post("/{task_id}/submit", response_model=TaskRead)
 async def submit_task(
     task_id: UUID,
+    background_tasks: BackgroundTasks,
     repo: TaskRepository = Depends(get_task_repo),
     db: AsyncSession = Depends(get_db),
 ) -> TaskRead:
@@ -206,8 +227,7 @@ async def submit_task(
 
     # Submit to dispatcher
     dispatcher = await get_task_dispatcher(db)
-    priority = TaskPriority(task.priority) if task.priority else TaskPriority.MEDIUM
-    success = await dispatcher.submit(task_id, priority)
+    success = await dispatcher.submit(task_id, _dispatcher_priority(task.priority))
 
     if not success:
         raise HTTPException(
@@ -217,6 +237,11 @@ async def submit_task(
 
     await db.commit()
     await db.refresh(task)
+    background_tasks.add_task(
+        execute_submitted_task,
+        session_factory_from_session(db),
+        task_id,
+    )
 
     return _task_to_read(task)
 

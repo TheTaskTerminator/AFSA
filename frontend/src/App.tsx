@@ -35,6 +35,7 @@ const TASK_STATUSES: ReadonlySet<TaskStatus> = new Set([
   'completed',
   'failed',
   'cancelled',
+  'timeout',
 ]);
 
 function isTaskStatus(value: unknown): value is TaskStatus {

@@ -8,13 +8,14 @@ from typing import Any, Callable, Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import settings
 from app.models.task import Task
 from app.orchestration.dispatcher.states import TaskState, TaskStateMachine
 from app.orchestration.messaging.publisher import EventType, get_event_publisher
 from app.orchestration.sandbox.pool import SandboxPool, get_sandbox_pool
+from app.api.v1.endpoints.websocket import get_connection_manager
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +55,12 @@ class TaskDispatcher:
         session: AsyncSession,
         pool_size: int = settings.sandbox_pool_size,
         default_timeout: int = settings.sandbox_timeout_seconds,
+        publish_events: bool = False,
     ):
         self._session = session
         self._pool_size = pool_size
         self._default_timeout = default_timeout
+        self._publish_events = publish_events
         self._queues: dict[TaskPriority, asyncio.Queue] = {
             TaskPriority.HIGH: asyncio.Queue(),
             TaskPriority.MEDIUM: asyncio.Queue(),
@@ -155,6 +158,43 @@ class TaskDispatcher:
         logger.info(f"Task {task_id} queued with priority {priority.value}")
         return True
 
+    async def execute_queued(self, task_id: UUID) -> bool:
+        """Execute an already-queued task in the current event loop."""
+        await self._remove_from_queue(task_id)
+        await self._execute_task(task_id)
+        return True
+
+    async def submit_and_execute(
+        self,
+        task_id: UUID,
+        priority: TaskPriority = TaskPriority.MEDIUM,
+    ) -> bool:
+        """Submit a task and execute it immediately in the current event loop.
+
+        This gives API-created tasks a deterministic minimal lifecycle while the
+        longer-lived queue worker remains available for future concurrent runners.
+        """
+        queued = await self.submit(task_id, priority)
+        if not queued:
+            return False
+
+        await self.execute_queued(task_id)
+        return True
+
+    async def _remove_from_queue(self, task_id: UUID) -> None:
+        """Remove a task id from all in-memory queues if present."""
+        for priority, queue in self._queues.items():
+            kept: list[UUID] = []
+            while True:
+                try:
+                    queued_task_id = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                if queued_task_id != task_id:
+                    kept.append(queued_task_id)
+            for queued_task_id in kept:
+                await queue.put(queued_task_id)
+
     async def cancel(self, task_id: UUID) -> bool:
         """Cancel a task.
 
@@ -221,8 +261,17 @@ class TaskDispatcher:
             logger.error(f"Task not found: {task_id}")
             return
 
-        # Update to RUNNING
-        await self._update_state(task_id, TaskState.RUNNING)
+        # Update to RUNNING only if the task is still queued. This prevents a
+        # cancellation that lands after submission but before the background
+        # worker starts from being overwritten by execution.
+        if not await self._update_state(
+            task_id,
+            TaskState.RUNNING,
+            expected_state=TaskState.QUEUED,
+        ):
+            logger.info(f"Task {task_id} is no longer queued; skipping execution")
+            return
+        await self._session.refresh(task)
 
         # Update progress
         if task_id in self._progress:
@@ -230,15 +279,16 @@ class TaskDispatcher:
             self._progress[task_id].started_at = datetime.utcnow()
 
         # Publish event
-        try:
-            publisher = await get_event_publisher()
-            await publisher.publish_task_event(
-                EventType.TASK_STARTED,
-                task_id,
-                type=task.type,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to publish event: {e}")
+        if self._publish_events:
+            try:
+                publisher = await get_event_publisher()
+                await publisher.publish_task_event(
+                    EventType.TASK_STARTED,
+                    task_id,
+                    type=task.type,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish event: {e}")
 
         try:
             # Get handler
@@ -254,6 +304,14 @@ class TaskDispatcher:
             # Wait with timeout
             try:
                 result_data = await asyncio.wait_for(execution_task, timeout=timeout)
+
+                # Move through verification before terminal completion so the
+                # persisted state machine and frontend visualization observe the
+                # full minimal lifecycle.
+                await self._update_state(task_id, TaskState.VERIFYING)
+                if task_id in self._progress:
+                    self._progress[task_id].state = TaskState.VERIFYING
+                    self._progress[task_id].progress_percent = 90
 
                 # Update task result
                 await self._session.execute(
@@ -272,16 +330,22 @@ class TaskDispatcher:
                     self._progress[task_id].progress_percent = 100
                     self._progress[task_id].completed_at = datetime.utcnow()
 
-                # Publish completion event
                 try:
-                    publisher = await get_event_publisher()
-                    await publisher.publish_task_event(
-                        EventType.TASK_COMPLETED,
-                        task_id,
-                        result=result_data,
-                    )
+                    await get_connection_manager().broadcast_task_completed(task_id, result_data)
                 except Exception as e:
-                    logger.warning(f"Failed to publish event: {e}")
+                    logger.warning(f"Failed to broadcast task completion: {e}")
+
+                # Publish completion event
+                if self._publish_events:
+                    try:
+                        publisher = await get_event_publisher()
+                        await publisher.publish_task_event(
+                            EventType.TASK_COMPLETED,
+                            task_id,
+                            result=result_data,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to publish event: {e}")
 
                 logger.info(f"Task {task_id} completed successfully")
 
@@ -302,68 +366,102 @@ class TaskDispatcher:
 
     async def _handle_timeout(self, task_id: UUID) -> None:
         """Handle task timeout."""
-        await self._update_state(task_id, TaskState.TIMEOUT)
-
-        # Update error message
+        # Persist error details before the terminal state broadcast so clients
+        # that react to the event can immediately read the durable error.
         await self._session.execute(
             update(Task)
             .where(Task.id == task_id)
             .values(error_message="Task execution timed out")
         )
         await self._session.flush()
+        await self._update_state(task_id, TaskState.TIMEOUT)
 
         # Update progress
         if task_id in self._progress:
             self._progress[task_id].state = TaskState.TIMEOUT
 
         # Publish event
-        try:
-            publisher = await get_event_publisher()
-            await publisher.publish_task_event(
-                EventType.TASK_TIMEOUT,
-                task_id,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to publish event: {e}")
+        if self._publish_events:
+            try:
+                publisher = await get_event_publisher()
+                await publisher.publish_task_event(
+                    EventType.TASK_TIMEOUT,
+                    task_id,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish event: {e}")
 
         logger.warning(f"Task {task_id} timed out")
 
     async def _handle_failure(self, task_id: UUID, error: str) -> None:
         """Handle task failure."""
-        await self._update_state(task_id, TaskState.FAILED)
-
-        # Update error message
+        # Persist error details before the terminal state broadcast so clients
+        # that react to the event can immediately read the durable error.
         await self._session.execute(
             update(Task)
             .where(Task.id == task_id)
             .values(error_message=error, completed_at=datetime.utcnow())
         )
         await self._session.flush()
+        await self._update_state(task_id, TaskState.FAILED)
 
         # Update progress
         if task_id in self._progress:
             self._progress[task_id].state = TaskState.FAILED
 
-        # Publish event
         try:
-            publisher = await get_event_publisher()
-            await publisher.publish_task_event(
-                EventType.TASK_FAILED,
-                task_id,
-                error=error,
-            )
+            await get_connection_manager().broadcast_task_failed(task_id, error)
         except Exception as e:
-            logger.warning(f"Failed to publish event: {e}")
+            logger.warning(f"Failed to broadcast task failure: {e}")
+
+        # Publish event
+        if self._publish_events:
+            try:
+                publisher = await get_event_publisher()
+                await publisher.publish_task_event(
+                    EventType.TASK_FAILED,
+                    task_id,
+                    error=error,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish event: {e}")
 
         logger.error(f"Task {task_id} failed: {error}")
 
-    async def _update_state(self, task_id: UUID, new_state: TaskState) -> None:
-        """Update task state in database."""
-        await self._session.execute(
-            update(Task).where(Task.id == task_id).values(status=new_state.value)
-        )
+    async def _update_state(
+        self,
+        task_id: UUID,
+        new_state: TaskState,
+        expected_state: TaskState | None = None,
+    ) -> bool:
+        """Persist a task state transition and then notify task subscribers."""
+        values: dict[str, Any] = {"status": new_state.value}
+        if new_state == TaskState.RUNNING:
+            values["started_at"] = datetime.utcnow()
+
+        statement = update(Task).where(Task.id == task_id)
+        if expected_state is not None:
+            statement = statement.where(Task.status == expected_state.value)
+
+        result = await self._session.execute(statement.values(**values))
         await self._session.flush()
+        if expected_state is not None and result.rowcount == 0:
+            await self._session.rollback()
+            return False
+
+        await self._session.commit()
+
+        try:
+            await get_connection_manager().broadcast_task_status(
+                task_id,
+                new_state.value,
+                message=f"Task is {new_state.value}",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast task state: {e}")
+
         logger.debug(f"Task {task_id} state updated to {new_state.value}")
+        return True
 
     async def _update_progress(
         self,
@@ -376,27 +474,84 @@ class TaskDispatcher:
             self._progress[task_id].progress_percent = progress_percent
             self._progress[task_id].message = message
 
-        # Publish progress event
         try:
-            publisher = await get_event_publisher()
-            await publisher.publish_task_event(
-                EventType.TASK_PROGRESS,
+            await get_connection_manager().broadcast_task_progress(
                 task_id,
-                progress_percent=progress_percent,
+                progress_percent,
                 message=message,
+                status=self._progress[task_id].state.value if task_id in self._progress else None,
             )
         except Exception as e:
-            logger.warning(f"Failed to publish progress: {e}")
+            logger.warning(f"Failed to broadcast progress: {e}")
+
+        # Publish progress event
+        if self._publish_events:
+            try:
+                publisher = await get_event_publisher()
+                await publisher.publish_task_event(
+                    EventType.TASK_PROGRESS,
+                    task_id,
+                    progress_percent=progress_percent,
+                    message=message,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish progress: {e}")
 
 
-# Global dispatcher factory
-_dispatchers: dict[str, TaskDispatcher] = {}
+# Dispatcher helpers
+
+async def default_task_handler(task: Task, update_progress: Callable) -> dict[str, Any]:
+    """Minimal deterministic executor for PM-created tasks.
+
+    It proves the lifecycle loop without mutating project files. Later phases can
+    replace this handler with Generator/Snapshot/Sandbox-backed execution.
+    """
+    await update_progress(task.id, 25, "需求已接收，正在分析任务")
+    await update_progress(task.id, 60, "正在生成最小执行结果")
+    await update_progress(task.id, 85, "执行结果准备完成，进入验证")
+    return {
+        "success": True,
+        "output": f"Completed task lifecycle for: {task.description}",
+        "files_changed": [],
+        "metrics": {
+            "executor": "default_task_handler",
+            "task_type": task.type,
+        },
+    }
+
+
+def _build_task_dispatcher(session: AsyncSession) -> TaskDispatcher:
+    """Create a dispatcher bound to one short-lived database session."""
+    dispatcher = TaskDispatcher(session)
+    for task_type in ["feature", "bugfix", "refactor", "test", "doc"]:
+        dispatcher.register_handler(task_type, default_task_handler)
+    return dispatcher
+
+
+def session_factory_from_session(
+    session: AsyncSession,
+) -> async_sessionmaker[AsyncSession]:
+    """Create a fresh AsyncSession factory using the current session's engine."""
+    if session.bind is None:
+        raise RuntimeError("Cannot create task execution session without a DB bind")
+    return async_sessionmaker(
+        session.bind,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+
+async def execute_submitted_task(
+    session_factory: async_sessionmaker[AsyncSession],
+    task_id: UUID,
+) -> None:
+    """Execute an already queued task using a fresh database session."""
+    async with session_factory() as session:
+        dispatcher = await get_task_dispatcher(session)
+        await dispatcher.execute_queued(task_id)
+        await session.commit()
 
 
 async def get_task_dispatcher(session: AsyncSession) -> TaskDispatcher:
-    """Get or create a task dispatcher for a session."""
-    session_id = str(id(session))
-    if session_id not in _dispatchers:
-        _dispatchers[session_id] = TaskDispatcher(session)
-        await _dispatchers[session_id].start()
-    return _dispatchers[session_id]
+    """Create a task dispatcher for a session."""
+    return _build_task_dispatcher(session)

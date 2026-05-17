@@ -3,7 +3,7 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -28,6 +28,12 @@ from app.schemas.task import (
 )
 from app.agents.base import TaskCard
 from app.agents.pm_agent.agent import PMAgent
+from app.orchestration.dispatcher.dispatcher import (
+    TaskPriority as DispatcherTaskPriority,
+    execute_submitted_task,
+    get_task_dispatcher,
+    session_factory_from_session,
+)
 
 router = APIRouter()
 
@@ -87,6 +93,14 @@ def _coerce_task_priority(value: object) -> TaskPriority:
         return TaskPriority(str(getattr(value, "value", value)))
     except ValueError:
         return TaskPriority.MEDIUM
+
+
+def _dispatcher_priority(value: object) -> DispatcherTaskPriority:
+    """Map API/agent priority values onto dispatcher priority values."""
+    try:
+        return DispatcherTaskPriority(str(getattr(value, "value", value)))
+    except ValueError:
+        return DispatcherTaskPriority.MEDIUM
 
 
 def _task_create_from_card(task_card: TaskCard, session_id: UUID) -> TaskCreate:
@@ -213,6 +227,7 @@ async def get_conversation(
 async def send_message(
     session_id: UUID,
     message: MessageCreate,
+    background_tasks: BackgroundTasks,
     repo: ConversationRepository = Depends(get_conversation_repo),
     db: AsyncSession = Depends(get_db),
 ) -> MessageRead:
@@ -282,6 +297,24 @@ async def send_message(
     await db.refresh(assistant_msg)
     if created_task is not None:
         await db.refresh(created_task)
+        dispatcher = await get_task_dispatcher(db)
+        await dispatcher.submit(
+            created_task.id,
+            priority=_dispatcher_priority(created_task.priority),
+        )
+        await db.commit()
+        await db.refresh(created_task)
+        assistant_msg.msg_metadata = {
+            **(assistant_msg.msg_metadata or {}),
+            "task_status": created_task.status,
+        }
+        await db.commit()
+        await db.refresh(assistant_msg)
+        background_tasks.add_task(
+            execute_submitted_task,
+            session_factory_from_session(db),
+            created_task.id,
+        )
 
     return _message_to_read(assistant_msg)
 

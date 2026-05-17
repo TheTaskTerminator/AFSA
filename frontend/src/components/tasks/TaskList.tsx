@@ -23,6 +23,7 @@ const statusIcons: Record<TaskStatus, React.ComponentType<{ className?: string }
   completed: CheckCircle,
   failed: AlertCircle,
   cancelled: AlertCircle,
+  timeout: AlertCircle,
 };
 
 const statusColors: Record<TaskStatus, string> = {
@@ -33,6 +34,7 @@ const statusColors: Record<TaskStatus, string> = {
   completed: 'text-green-500 bg-green-100',
   failed: 'text-red-500 bg-red-100',
   cancelled: 'text-yellow-600 bg-yellow-100',
+  timeout: 'text-orange-600 bg-orange-100',
 };
 
 const statusLabels: Record<TaskStatus, string> = {
@@ -43,6 +45,7 @@ const statusLabels: Record<TaskStatus, string> = {
   completed: '已完成',
   failed: '失败',
   cancelled: '已取消',
+  timeout: '超时',
 };
 
 const isActiveTask = (status: TaskStatus) => status === 'running' || status === 'verifying';

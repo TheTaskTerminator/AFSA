@@ -30,6 +30,7 @@ const statusConfig: Record<TaskStatus, {
   completed: { icon: CheckCircle, label: '已完成', color: 'text-green-500 bg-green-100' },
   failed: { icon: AlertCircle, label: '失败', color: 'text-red-500 bg-red-100' },
   cancelled: { icon: AlertCircle, label: '已取消', color: 'text-yellow-600 bg-yellow-100' },
+  timeout: { icon: AlertCircle, label: '超时', color: 'text-orange-600 bg-orange-100' },
 };
 
 const isActiveTask = (status: TaskStatus) => status === 'running' || status === 'verifying';

@@ -8,12 +8,38 @@ Tests all major API endpoints:
 - GET /api/v1/snapshots - Get snapshots
 - WebSocket connection tests
 """
+import asyncio
 import pytest
 import json
 from uuid import uuid4
 from httpx import AsyncClient
 
 from app.agents.base import AgentResponse, TaskCard, TaskPriority, TaskType
+from app.orchestration.dispatcher.dispatcher import (
+    execute_submitted_task,
+    session_factory_from_session,
+)
+
+
+async def _wait_for_task_status(
+    client: AsyncClient,
+    task_id: str,
+    expected_status: str,
+    attempts: int = 20,
+    delay: float = 0.05,
+):
+    """Poll a task until background execution reaches the expected status."""
+    last_task = None
+    for _ in range(attempts):
+        response = await client.get(f"/api/v1/tasks/{task_id}")
+        assert response.status_code == 200
+        last_task = response.json()
+        if last_task["status"] == expected_status:
+            return last_task
+        await asyncio.sleep(delay)
+    assert last_task is not None
+    assert last_task["status"] == expected_status
+    return last_task
 
 
 @pytest.mark.asyncio
@@ -72,6 +98,9 @@ class TestTaskEndpoints:
         
         assert "id" in data
         assert data["session_id"] == str(test_conversation.id)
+
+        task = await _wait_for_task_status(client, data["id"], "completed")
+        assert task["result"]["success"] is True
 
     async def test_get_task_by_id(self, client: AsyncClient, test_task):
         """
@@ -178,12 +207,34 @@ class TestTaskEndpoints:
         
         Verifies:
         - Task is submitted to dispatcher
-        - Status changes to queued
+        - Dispatcher drains the task to completion
         """
         response = await client.post(f"/api/v1/tasks/{test_task.id}/submit")
-        
-        # Note: May fail if dispatcher is not configured, but endpoint should exist
-        assert response.status_code in [200, 500]
+        assert response.status_code == 200
+
+        task = await _wait_for_task_status(client, str(test_task.id), "completed")
+        assert task["started_at"] is not None
+        assert task["completed_at"] is not None
+        assert task["result"]["success"] is True
+
+    async def test_background_executor_does_not_run_cancelled_task(self, session, test_task):
+        """
+        Test that background execution respects cancellation before start.
+
+        Verifies:
+        - A task no longer in queued state is not executed
+        - Cancelled remains a terminal state
+        """
+        test_task.status = "cancelled"
+        await session.commit()
+
+        await execute_submitted_task(session_factory_from_session(session), test_task.id)
+        await session.refresh(test_task)
+
+        assert test_task.status == "cancelled"
+        assert test_task.result is None
+        assert test_task.started_at is None
+        assert test_task.completed_at is None
 
     async def test_get_task_progress(self, client: AsyncClient, test_task):
         """
@@ -362,7 +413,51 @@ class TestConversationEndpoints:
         assert len(tasks) == 1
         assert tasks[0]["id"] == assistant_message["metadata"]["task_id"]
         assert tasks[0]["description"] == "Implement dashboard analytics for active users"
-        assert tasks[0]["status"] in {"pending", "queued"}
+        assert tasks[0]["status"] == "completed"
+        assert tasks[0]["result"]["success"] is True
+
+    async def test_send_message_runs_created_task_lifecycle_to_completion(
+        self,
+        client: AsyncClient,
+        test_conversation,
+        monkeypatch,
+    ):
+        """Conversation-created tasks should automatically flow through execution states."""
+
+        async def fake_process_message(self, session_id, message, context=None):
+            return AgentResponse(
+                success=True,
+                content="我已经拆解并开始执行这个任务。",
+                task_card=TaskCard(
+                    type=TaskType.FEATURE,
+                    priority=TaskPriority.MEDIUM,
+                    description="Implement lifecycle-visible task execution",
+                    structured_requirements=[],
+                    constraints={},
+                ),
+            )
+
+        monkeypatch.setattr(
+            "app.agents.pm_agent.agent.PMAgent.process_message",
+            fake_process_message,
+        )
+
+        response = await client.post(
+            f"/api/v1/conversations/{test_conversation.id}/messages",
+            json={"content": "请实现一个可以看到状态流转的任务"},
+        )
+
+        assert response.status_code == 200
+        task_id = response.json()["metadata"]["task_id"]
+
+        task_response = await client.get(f"/api/v1/tasks/{task_id}")
+        assert task_response.status_code == 200
+        task = task_response.json()
+        assert task["status"] == "completed"
+        assert task["started_at"] is not None
+        assert task["completed_at"] is not None
+        assert task["result"]["success"] is True
+        assert "lifecycle-visible" in task["result"]["output"]
 
     async def test_get_messages(self, client: AsyncClient, test_conversation):
         """
